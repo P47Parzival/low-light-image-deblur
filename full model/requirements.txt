@@ -3,3 +3,5 @@ numpy
 fastapi
 uvicorn
 python-multipart
+torch
+torchvision

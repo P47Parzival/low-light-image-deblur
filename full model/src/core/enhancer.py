@@ -7,19 +7,21 @@ import sys
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
-from src.core.zero_dce import ZeroDCE
+from src.core.zero_dce import enhance_net_nopool
 
 class LowLightEnhancer:
     def __init__(self, weights_path=None, device='cpu'):
         self.device = torch.device(device)
-        self.model = ZeroDCE().to(self.device)
-        self.model.eval()
+        # Initialize the model with scale_factor=1 as per typical usage or default
+        self.model = enhance_net_nopool(scale_factor=1).to(self.device)
         
         if weights_path and os.path.exists(weights_path):
             print(f"Loading weights from {weights_path}")
             self.model.load_state_dict(torch.load(weights_path, map_location=self.device))
         else:
-            print("Warning: No weights provided or file not found. Using random weights (for testing structure only).")
+            print(f"Warning: Weights file not found at {weights_path}. Using random weights.")
+        
+        self.model.eval()
 
     def enhance_frame(self, frame: np.ndarray) -> np.ndarray:
         """
@@ -38,7 +40,8 @@ class LowLightEnhancer:
 
         # Inference
         with torch.no_grad():
-            enhanced_img = self.model(img)
+            # The new model returns (enhance_image, x_r)
+            enhanced_img, _ = self.model(img)
 
         # Postprocess
         enhanced_img = enhanced_img.squeeze(0).permute(1, 2, 0) # CHW to HWC

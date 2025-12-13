@@ -9,3 +9,4 @@ roboflow
 ultralytics
 paddlepaddle
 paddleocr
+yt-dlp

@@ -7,3 +7,5 @@ torch
 torchvision
 roboflow
 ultralytics
+paddlepaddle
+paddleocr

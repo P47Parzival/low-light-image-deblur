@@ -5,3 +5,5 @@ uvicorn
 python-multipart
 torch
 torchvision
+roboflow
+ultralytics

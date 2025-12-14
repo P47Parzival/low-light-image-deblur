@@ -129,7 +129,7 @@ def main():
             data=yaml_path,
             epochs=50,
             imgsz=640,
-            batch=16,
+            batch=4,
             project='railway_hackathon_take2',
             name='merged_model_v1',
             freeze=10,

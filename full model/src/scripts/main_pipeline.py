@@ -92,7 +92,7 @@ def main_pipeline(video_path, weights_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Run the full Wagon Inspection Pipeline.")
     parser.add_argument("--video_path", type=str, required=True, help="Path to input video.")
-    parser.add_argument("--weights_path", type=str, default="railway_hackathon/wagon_counter_v1/weights/best.pt", help="Path to YOLO weights.")
+    parser.add_argument("--weights_path", type=str, default="railway_hackathon_take2/merged_model_v1/weights/best.pt", help="Path to YOLO weights.")
     
     args = parser.parse_args()
     

@@ -3,6 +3,8 @@ from ultralytics import YOLO
 import sys
 import os
 import argparse
+import multiprocessing as mp
+import time
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -10,104 +12,183 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.core.ocr_engine import WagonOCR
 from src.core.enhancer import LowLightEnhancer
 
+
+# -----------------------------
+# OCR Worker Process
+# -----------------------------
+
+def ocr_worker(input_queue, output_queue):
+    """
+    Runs OCR in a separate process.
+    """
+    ocr_engine = WagonOCR()
+
+    while True:
+        item = input_queue.get()
+        if item is None:
+            break
+
+        wagon_id, crop = item
+        text = ocr_engine.process_wagon(crop)
+
+        if text:
+            output_queue.put((wagon_id, text))
+
+
+# -----------------------------
+# Main Pipeline
+# -----------------------------
+
 def main_pipeline(video_path, weights_path):
+
     if not os.path.exists(video_path):
-        print(f"Error: Video file not found at {video_path}")
+        print("Video not found")
         return
 
-    # 1. Load Models
-    print(f"Loading YOLO model from {weights_path}...")
-    try:
-        yolo_model = YOLO(weights_path)
-    except Exception as e:
-        print(f"Error loading YOLO model: {e}")
-        return
+    print("[INFO] Loading YOLO + ByteTrack")
+    model = YOLO(weights_path)
 
-    try:
-        ocr_engine = WagonOCR()
-    except Exception as e:
-        print(f"Error loading OCR engine: {e}")
-        return
-
-    # Check for enhancer weights (optional integration)
     enhancer = None
-    # Uncomment to enable enhancer if weights exist
-    # enhancer = LowLightEnhancer(weights_path='src/core/Epoch99.pth') 
+    # enhancer = LowLightEnhancer(weights_path='src/core/Epoch99.pth')
 
-    # 2. Open Video
     cap = cv2.VideoCapture(video_path)
     if not cap.isOpened():
-        print("Error: Could not open video.")
+        print("Failed to open video")
         return
 
-    print("Starting pipeline. Press 'q' to quit.")
+    # -----------------------------
+    # OCR multiprocessing setup
+    # -----------------------------
+    ocr_input_queue = mp.Queue(maxsize=10)
+    ocr_output_queue = mp.Queue()
 
+    ocr_process = mp.Process(
+        target=ocr_worker,
+        args=(ocr_input_queue, ocr_output_queue),
+        daemon=True
+    )
+    ocr_process.start()
+
+    # -----------------------------
+    # Runtime memory
+    # -----------------------------
+    wagon_text = {}      # track_id -> OCR text
+    ocr_requested = set()
+
+    input_size = 640
     frame_count = 0
-    skip_frames = 3  # Process 1 frame, skip 2. Increase this if still slow.
-    last_results = None # Store results to draw on skipped frames
+    skip_frames = 3      # GPU later → 1 or 2
+
+    print("[INFO] Starting pipeline (press Q to quit)")
 
     while cap.isOpened():
         success, frame = cap.read()
-        if not success: 
+        if not success:
             break
-        
-        frame_count += 1
 
-        # --- STEP 2: LOW LIGHT ENHANCEMENT ---
+        frame_count += 1
+        h, w = frame.shape[:2]
+
         if enhancer:
             frame = enhancer.enhance_frame(frame)
 
-        # --- STEP 3: WAGON DETECTION ---
-        # Only run YOLO every 'skip_frames'
-        if frame_count % skip_frames == 0:
-            results = yolo_model(frame, stream=True, verbose=False)
-            # Convert generator to list so we can reuse it for skipped frames
-            last_results = list(results) 
-        
-        # Use the last known results (or empty if none yet)
-        current_results = last_results if last_results else []
+        resized = cv2.resize(frame, (input_size, input_size))
 
-        for r in current_results:
-            boxes = r.boxes
-            for box in boxes:
-                x1, y1, x2, y2 = map(int, box.xyxy[0])
-                
-                # Ensure coordinates are within frame bounds
-                h, w, _ = frame.shape
+        # -----------------------------
+        # YOLO + ByteTrack
+        # -----------------------------
+        if frame_count % skip_frames == 0:
+            results = model.track(
+                resized,
+                persist=True,
+                tracker="trackers/byte_track.yaml",
+                verbose=False
+            )
+        else:
+            results = model.predict(resized, verbose=False)
+
+        # -----------------------------
+        # Read OCR results (non-blocking)
+        # -----------------------------
+        while not ocr_output_queue.empty():
+            tid, text = ocr_output_queue.get()
+            wagon_text[tid] = text
+            print(f"[OCR] Track {tid}: {text}")
+
+        # -----------------------------
+        # Draw results
+        # -----------------------------
+        for r in results:
+            if r.boxes.id is None:
+                continue
+
+            for box, track_id in zip(r.boxes.xyxy, r.boxes.id):
+                track_id = int(track_id)
+
+                x1, y1, x2, y2 = box
+                x1 = int(x1 * w / input_size)
+                x2 = int(x2 * w / input_size)
+                y1 = int(y1 * h / input_size)
+                y2 = int(y2 * h / input_size)
+
                 x1, y1 = max(0, x1), max(0, y1)
                 x2, y2 = min(w, x2), min(h, y2)
 
-                # Crop the wagon
-                wagon_crop = frame[y1:y2, x1:x2]
+                # Request OCR ONCE per track
+                if (
+                    track_id not in ocr_requested
+                    and (x2 - x1) > 200
+                    and frame_count % skip_frames == 0
+                ):
+                    crop = frame[y1:y2, x1:x2]
+                    try:
+                        ocr_input_queue.put_nowait((track_id, crop))
+                        ocr_requested.add(track_id)
+                    except:
+                        pass
 
-                # --- STEP 4 & 5: OCR ---
-                # OPTIMIZATION: Only run OCR on the specific frame we actually detected on
-                # Otherwise, just draw the box without re-running OCR
-                if frame_count % skip_frames == 0:
-                    if (x2 - x1) > 200: 
-                        wagon_number = ocr_engine.process_wagon(wagon_crop)
-                        
-                        if wagon_number:
-                            # Draw the number on the main frame
-                            cv2.putText(frame, f"ID: {wagon_number}", (x1, y1 - 10), 
-                                        cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
-                            print(f"Detected ID: {wagon_number}")
+                label = f"ID {track_id}"
+                if track_id in wagon_text:
+                    label += f" | {wagon_text[track_id]}"
 
-                # Draw the box
                 cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
+                cv2.putText(
+                    frame,
+                    label,
+                    (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX,
+                    0.7,
+                    (0, 255, 0),
+                    2
+                )
 
         cv2.imshow("Wagon Inspection AI", frame)
         if cv2.waitKey(1) & 0xFF == ord('q'):
             break
 
+    # -----------------------------
+    # Cleanup
+    # -----------------------------
+    ocr_input_queue.put(None)
+    ocr_process.join()
+
     cap.release()
     cv2.destroyAllWindows()
 
+
+# -----------------------------
+# Entry point
+# -----------------------------
+
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Run the full Wagon Inspection Pipeline.")
-    parser.add_argument("--video_path", type=str, required=True, help="Path to input video.")
-    parser.add_argument("--weights_path", type=str, default="railway_hackathon_take2/merged_model_v1/weights/best.pt", help="Path to YOLO weights.")
-    
+    mp.set_start_method("spawn", force=True)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--video_path", required=True)
+    parser.add_argument(
+        "--weights_path",
+        default="railway_hackathon_take2/merged_model_v1/weights/best.pt"
+    )
+
     args = parser.parse_args()
-    
     main_pipeline(args.video_path, args.weights_path)

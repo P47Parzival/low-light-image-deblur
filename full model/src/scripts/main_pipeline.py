@@ -5,190 +5,141 @@ import os
 import argparse
 import multiprocessing as mp
 import time
+from collections import deque
 
 # Add project root to path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 
 from src.core.ocr_engine import WagonOCR
+from src.core.indian_railways import IndianWagonParser
+from src.scripts.pipeline_viz import draw_stats, draw_track
 from src.core.enhancer import LowLightEnhancer
 
-
 # -----------------------------
-# OCR Worker Process
+# OCR Worker
 # -----------------------------
-
 def ocr_worker(input_queue, output_queue):
-    """
-    Runs OCR in a separate process.
-    """
     ocr_engine = WagonOCR()
-
     while True:
         item = input_queue.get()
-        if item is None:
-            break
-
-        wagon_id, crop = item
-        text = ocr_engine.process_wagon(crop)
-
-        if text:
-            output_queue.put((wagon_id, text))
-
+        if item is None: break
+        wagon_id, crop, req_time = item
+        
+        # Raw text
+        raw_text = ocr_engine.process_wagon(crop)
+        
+        # Try Parsing
+        parsed_data = None
+        if raw_text:
+            parsed_data = IndianWagonParser.parse(raw_text)
+            
+        if raw_text:
+            output_queue.put((wagon_id, raw_text, parsed_data, req_time))
 
 # -----------------------------
-# Main Pipeline
+# Main Loop
 # -----------------------------
-
 def main_pipeline(video_path, weights_path):
-
-    if not os.path.exists(video_path):
-        print("Video not found")
-        return
-
-    print("[INFO] Loading YOLO + ByteTrack")
+    if not os.path.exists(video_path): return
     model = YOLO(weights_path)
-
-    enhancer = None
-    # enhancer = LowLightEnhancer(weights_path='src/core/Epoch99.pth')
-
     cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
-        print("Failed to open video")
-        return
 
-    # -----------------------------
-    # OCR multiprocessing setup
-    # -----------------------------
-    ocr_input_queue = mp.Queue(maxsize=10)
-    ocr_output_queue = mp.Queue()
+    # Multiprocessing
+    ocr_in_q = mp.Queue(maxsize=10)
+    ocr_out_q = mp.Queue()
+    ocr_p = mp.Process(target=ocr_worker, args=(ocr_in_q, ocr_out_q), daemon=True)
+    ocr_p.start()
 
-    ocr_process = mp.Process(
-        target=ocr_worker,
-        args=(ocr_input_queue, ocr_output_queue),
-        daemon=True
-    )
-    ocr_process.start()
-
-    # -----------------------------
-    # Runtime memory
-    # -----------------------------
-    wagon_text = {}      # track_id -> OCR text
+    # State
+    wagon_data = {} # id -> {raw, parsed}
     ocr_requested = set()
+    
+    # Profiler
+    metrics = {
+        'fps': deque(maxlen=50),
+        'det': deque(maxlen=50),
+        'ocr': deque(maxlen=50)
+    }
+    prev_time = time.time()
+    frame_cnt = 0
 
-    input_size = 640
-    frame_count = 0
-    skip_frames = 3      # GPU later → 1 or 2
-
-    print("[INFO] Starting pipeline (press Q to quit)")
+    print("[INFO] Pipeline Started. Press 'Q' to quit.")
 
     while cap.isOpened():
         success, frame = cap.read()
-        if not success:
-            break
-
-        frame_count += 1
+        if not success: break
+        
+        frame_cnt += 1
         h, w = frame.shape[:2]
 
-        if enhancer:
-            frame = enhancer.enhance_frame(frame)
+        # 1. Detection
+        t0 = time.time()
+        results = model.track(frame, persist=True, tracker="trackers/byte_track.yaml", verbose=False)
+        metrics['det'].append((time.time()-t0)*1000)
 
-        resized = cv2.resize(frame, (input_size, input_size))
+        # 2. Check OCR Results
+        while not ocr_out_q.empty():
+            tid, raw, parsed, req_t = ocr_out_q.get()
+            metrics['ocr'].append((time.time()-req_t)*1000)
+            
+            wagon_data[tid] = {'raw': raw, 'parsed': parsed}
+            
+            if parsed:
+                print(f"[MATCH] ID {tid}: {parsed['formatted']} ({parsed['type']})")
 
-        # -----------------------------
-        # YOLO + ByteTrack
-        # -----------------------------
-        if frame_count % skip_frames == 0:
-            results = model.track(
-                resized,
-                persist=True,
-                tracker="trackers/byte_track.yaml",
-                verbose=False
-            )
-        else:
-            results = model.predict(resized, verbose=False)
-
-        # -----------------------------
-        # Read OCR results (non-blocking)
-        # -----------------------------
-        while not ocr_output_queue.empty():
-            tid, text = ocr_output_queue.get()
-            wagon_text[tid] = text
-            print(f"[OCR] Track {tid}: {text}")
-
-        # -----------------------------
-        # Draw results
-        # -----------------------------
-        for r in results:
-            if r.boxes.id is None:
-                continue
-
-            for box, track_id in zip(r.boxes.xyxy, r.boxes.id):
+        # 3. Process Tracks
+        active_tracks = 0
+        if results and results[0].boxes.id is not None:
+            active_tracks = len(results[0].boxes.id)
+            for box, track_id in zip(results[0].boxes.xyxy, results[0].boxes.id):
                 track_id = int(track_id)
+                x1, y1, x2, y2 = map(int, box)
+                
+                # Request OCR condition
+                if track_id not in ocr_requested and (x2-x1) > 150 and frame_cnt % 3 == 0:
+                     crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
+                     try: ocr_in_q.put_nowait((track_id, crop, time.time()))
+                     except: pass
+                     ocr_requested.add(track_id)
 
-                x1, y1, x2, y2 = box
-                x1 = int(x1 * w / input_size)
-                x2 = int(x2 * w / input_size)
-                y1 = int(y1 * h / input_size)
-                y2 = int(y2 * h / input_size)
+                # Info Text Construction
+                info = None
+                if track_id in wagon_data:
+                    d = wagon_data[track_id]
+                    if d['parsed']:
+                        p = d['parsed']
+                        info = f"{p['formatted']}\nType: {p['type']}\nRly: {p['railway']}\nYr: {p['year']}"
+                    else:
+                        info = f"Raw: {d['raw']}"
 
-                x1, y1 = max(0, x1), max(0, y1)
-                x2, y2 = min(w, x2), min(h, y2)
+                draw_track(frame, (x1,y1,x2,y2), track_id, info)
 
-                # Request OCR ONCE per track
-                if (
-                    track_id not in ocr_requested
-                    and (x2 - x1) > 200
-                    and frame_count % skip_frames == 0
-                ):
-                    crop = frame[y1:y2, x1:x2]
-                    try:
-                        ocr_input_queue.put_nowait((track_id, crop))
-                        ocr_requested.add(track_id)
-                    except:
-                        pass
+        # 4. Stats & Display
+        curr_time = time.time()
+        metrics['fps'].append(1 / (curr_time - prev_time) if curr_time > prev_time else 0)
+        prev_time = curr_time
+        
+        stats = [
+            f"FPS: {sum(metrics['fps'])/len(metrics['fps']):.1f}" if metrics['fps'] else "FPS: 0",
+            f"Detection: {sum(metrics['det'])/len(metrics['det']):.0f} ms" if metrics['det'] else "Det: 0",
+            f"OCR Latency: {sum(metrics['ocr'])/len(metrics['ocr']):.0f} ms" if metrics['ocr'] else "OCR: 0",
+            f"Active Tracks: {active_tracks}"
+        ]
+        draw_stats(frame, stats)
 
-                label = f"ID {track_id}"
-                if track_id in wagon_text:
-                    label += f" | {wagon_text[track_id]}"
+        cv2.imshow("Wagon Pipeline", frame)
+        if cv2.waitKey(1) == ord('q'): break
 
-                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 0, 0), 2)
-                cv2.putText(
-                    frame,
-                    label,
-                    (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.7,
-                    (0, 255, 0),
-                    2
-                )
-
-        cv2.imshow("Wagon Inspection AI", frame)
-        if cv2.waitKey(1) & 0xFF == ord('q'):
-            break
-
-    # -----------------------------
     # Cleanup
-    # -----------------------------
-    ocr_input_queue.put(None)
-    ocr_process.join()
-
+    ocr_in_q.put(None)
+    ocr_p.join()
     cap.release()
     cv2.destroyAllWindows()
 
-
-# -----------------------------
-# Entry point
-# -----------------------------
-
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", required=True)
-    parser.add_argument(
-        "--weights_path",
-        default="railway_hackathon_take2/merged_model_v1/weights/best.pt"
-    )
-
+    parser.add_argument("--weights_path", default="railway_hackathon_take2/merged_model_v1/weights/best.pt")
     args = parser.parse_args()
     main_pipeline(args.video_path, args.weights_path)

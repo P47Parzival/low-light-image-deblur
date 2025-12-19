@@ -1,0 +1,12 @@
+opencv-python
+numpy
+fastapi
+uvicorn
+python-multipart
+torch
+torchvision
+roboflow
+ultralytics
+paddlepaddle
+paddleocr
+yt-dlp

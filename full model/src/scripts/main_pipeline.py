@@ -91,16 +91,49 @@ def main_pipeline(video_path, weights_path):
         active_tracks = 0
         if results and results[0].boxes.id is not None:
             active_tracks = len(results[0].boxes.id)
-            for box, track_id in zip(results[0].boxes.xyxy, results[0].boxes.id):
+            
+            # Get boxes, IDs, and Class IDs
+            boxes = results[0].boxes.xyxy.cpu()
+            track_ids = results[0].boxes.id.cpu()
+            clss = results[0].boxes.cls.cpu()
+
+            for box, track_id, cls in zip(boxes, track_ids, clss):
                 track_id = int(track_id)
+                class_id = int(cls)
                 x1, y1, x2, y2 = map(int, box)
                 
-                # Request OCR condition
-                if track_id not in ocr_requested and (x2-x1) > 150 and frame_cnt % 3 == 0:
-                     crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
-                     try: ocr_in_q.put_nowait((track_id, crop, time.time()))
-                     except: pass
-                     ocr_requested.add(track_id)
+                # Visualization Colors
+                # Class 0 (Wagon): Blue
+                # Class 1 (Parts): Orange
+                # Class 2 (Number): Green
+                color = (255, 0, 0) 
+                if class_id == 1: color = (0, 165, 255)
+                elif class_id == 2: color = (0, 255, 0)
+
+                # Request OCR condition - ONLY FOR CLASS 2 (Wagon Numbers)
+                if class_id == 2:
+                    if track_id not in ocr_requested and (x2-x1) > 50 and frame_cnt % 3 == 0:
+                         crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
+                         try: ocr_in_q.put_nowait((track_id, crop, time.time()))
+                         except: pass
+                         ocr_requested.add(track_id)
+
+                # Info Text Construction
+                info = None
+                if track_id in wagon_data:
+                    d = wagon_data[track_id]
+                    if d['parsed']:
+                        p = d['parsed']
+                        info = f"{p['formatted']}\nType: {p['type']}\nRly: {p['railway']}\nYr: {p['year']}"
+                    else:
+                        info = f"Raw: {d['raw']}"
+                
+                # Add class label if not parsed info
+                if info is None:
+                    class_names = {0: 'Wagon', 1: 'Part', 2: 'Number'}
+                    info = class_names.get(class_id, str(class_id))
+
+                draw_track(frame, (x1,y1,x2,y2), track_id, info, color=color)
 
                 # Info Text Construction
                 info = None
@@ -140,6 +173,6 @@ if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", required=True)
-    parser.add_argument("--weights_path", default="railway_hackathon_take2/merged_model_v1/weights/best.pt")
+    parser.add_argument("--weights_path", default="railway_hackathon_take5/merged_model_v4/weights/best.pt")
     args = parser.parse_args()
     main_pipeline(args.video_path, args.weights_path)

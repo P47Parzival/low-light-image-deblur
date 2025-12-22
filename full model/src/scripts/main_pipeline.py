@@ -173,6 +173,6 @@ if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", required=True)
-    parser.add_argument("--weights_path", default="railway_hackathon_take5/merged_model_v4/weights/best.pt")
+    parser.add_argument("--weights_path", default="railway_hackathon_take4/merged_model_v3/weights/best.pt")
     args = parser.parse_args()
     main_pipeline(args.video_path, args.weights_path)

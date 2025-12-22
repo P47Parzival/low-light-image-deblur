@@ -10,3 +10,4 @@ ultralytics
 paddlepaddle
 paddleocr
 yt-dlp
+tensorflow

@@ -14,6 +14,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'
 from src.core.ocr_engine import WagonOCR
 from src.core.indian_railways import IndianWagonParser
 from src.scripts.pipeline_viz import draw_stats, draw_track
+from src.core.deblur_engine import DeblurGANEngine
+from src.core.blur_metric import calculate_blur_score
 
 # -----------------------------
 # OCR Processing (CPU)
@@ -37,7 +39,7 @@ def ocr_worker(input_queue, output_queue):
 # -----------------------------
 # Cascaded Pipeline
 # -----------------------------
-def cascaded_pipeline(video_path, model_a_path, model_b_path):
+def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path):
     if not os.path.exists(video_path): return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
@@ -50,6 +52,20 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path):
         model_b = None
     else:
         model_b = YOLO(model_b_path)
+
+    # DeblurGAN Setup
+    deblur_engine = None
+    if os.path.exists(deblur_model_path):
+        try:
+            print(f"[INFO] Loading DeblurGAN: {deblur_model_path}")
+            deblur_engine = DeblurGANEngine(deblur_model_path)
+        except Exception as e:
+            print(f"[WARNING] Failed to load DeblurGAN: {e}. Running without deblurring.")
+    else:
+        print(f"[WARNING] DeblurGAN weights not found at {deblur_model_path}. Running without deblurring.")
+        
+    deblur_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/DeblurredImg')
+    os.makedirs(deblur_save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
     
@@ -131,8 +147,25 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path):
                             # Only trigger OCR once per wagon for now
                             if wagon_id not in ocr_requested:
                                 number_img = wagon_crop[ny1:ny2, nx1:nx2]
+                                
                                 if number_img.size > 0:
-                                    ocr_in_q.put((wagon_id, number_img, time.time()))
+                                    # DEBLUR CHECK
+                                    final_img = number_img
+                                    if deblur_engine:
+                                        score = calculate_blur_score(number_img)
+                                        # Threshold logic: Lower score = more blur. 
+                                        # Typical Laplacian var for sharp text is > 100-200.
+                                        # We trigger deblur if score < 150 (Tunable)
+                                        if score < 150:
+                                            # print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f})")
+                                            final_img = deblur_engine.deblur(number_img)
+                                            
+                                            # Save Result
+                                            ts = int(time.time()*100)
+                                            save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                                            cv2.imwrite(save_path, final_img)
+                                    
+                                    ocr_in_q.put((wagon_id, final_img, time.time()))
                                     ocr_requested.add(wagon_id)
                                     
                             # Visualization
@@ -285,6 +318,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_a", default="railway_hackathon_take4/merged_model_v3/weights/best.pt")
     # Placeholder for Model B until user trains it
     parser.add_argument("--model_b", default="railway_hackathon_numbers/number_detector_v1/weights/best.pt")
+    parser.add_argument("--deblur_model", default="NAFnet/NAFNet-GoPro-width32.pth")
     
     args = parser.parse_args()
-    cascaded_pipeline(args.video_path, args.model_a, args.model_b)
+    cascaded_pipeline(args.video_path, args.model_a, args.model_b, args.deblur_model)

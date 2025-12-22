@@ -1,0 +1,47 @@
++-----------------------------------------------------------------------+
+|  [Logo]  INDIAN RAILWAYS - AUTOMATED FREIGHT INSPECTION REPORT        |
++-----------------------------------------------------------------------+
+|  Site: Ahemdabad Jn (Cam-02)   |   Date: 22-Dec-2025   |   Time: 19:06|
+|  Train Speed: 62 km/h          |   Total Wagons: 30       |   Defects: 0 |
++-----------------------------------------------------------------------+
+|  [ CRITICAL ALERTS ]                                                  |
+|  * No Critical Defects Detected by AI System                          |
+|                                                                       |
++-----------------------------------------------------------------------+
+|  [ CONSIST LIST ]                                                     |
+|  #   | Wagon ID       | Type   | Owner | Condition  | Timestamp       |
+|  1   | Track-1        | -      | -     | Good       | -               |
+|  2   | Track-2        | -      | -     | Good       | -               |
+|  3   | Track-3        | -      | -     | Good       | -               |
+|  4   | Track-4        | -      | -     | Good       | -               |
+|  5   | Track-5        | -      | -     | Good       | -               |
+|  6   | Track-6        | -      | -     | Good       | -               |
+|  7   | Track-7        | -      | -     | Good       | -               |
+|  8   | Track-8        | -      | -     | Good       | -               |
+|  9   | Track-9        | -      | -     | Good       | -               |
+|  10  | Track-13       | -      | -     | Good       | -               |
+|  11  | Track-14       | -      | -     | Good       | -               |
+|  12  | Track-15       | -      | -     | Good       | -               |
+|  13  | Track-16       | -      | -     | Good       | -               |
+|  14  | Track-19       | -      | -     | Good       | -               |
+|  15  | Track-21       | -      | -     | Good       | -               |
+|  16  | Track-22       | -      | -     | Good       | -               |
+|  17  | Track-23       | -      | -     | Good       | -               |
+|  18  | Track-24       | -      | -     | Good       | -               |
+|  19  | Track-26       | -      | -     | Good       | -               |
+|  20  | Track-27       | -      | -     | Good       | -               |
+|  21  | Track-28       | -      | -     | Good       | -               |
+|  22  | Track-29       | -      | -     | Good       | -               |
+|  23  | Track-30       | -      | -     | Good       | -               |
+|  24  | Track-31       | -      | -     | Good       | -               |
+|  25  | Track-33       | -      | -     | Good       | -               |
+|  26  | Track-35       | -      | -     | Good       | -               |
+|  27  | Track-37       | -      | -     | Good       | -               |
+|  28  | Track-38       | -      | -     | Good       | -               |
+|  29  | Track-39       | -      | -     | Good       | -               |
+|  30  | Track-40       | -      | -     | Good       | -               |
++-----------------------------------------------------------------------+
+|  [ AI SYSTEM LOG ]                                                    |
+|  * 325 Frames Processed                                              |
+|  * Pipeline: Cascaded YOLOv8 + PaddleOCR                              |
++-----------------------------------------------------------------------+

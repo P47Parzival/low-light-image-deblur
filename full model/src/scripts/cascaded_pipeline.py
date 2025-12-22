@@ -35,6 +35,9 @@ def ocr_worker(input_queue, output_queue):
         if raw_text:
             parsed = IndianWagonParser.parse(raw_text)
             output_queue.put((wagon_id, raw_text, parsed, req_time))
+        else:
+            print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
+            output_queue.put((wagon_id, "OCR Failed", None, req_time))
 
 # -----------------------------
 # Cascaded Pipeline
@@ -146,9 +149,28 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                             
                             # Only trigger OCR once per wagon for now
                             if wagon_id not in ocr_requested:
-                                number_img = wagon_crop[ny1:ny2, nx1:nx2]
+                                # 1. Add Padding (50%) - Sufficient context without too much noise
+                                pad_w = int((nx2 - nx1) * 0.5)
+                                pad_h = int((ny2 - ny1) * 0.5)
+                                px1 = max(0, nx1 - pad_w)
+                                py1 = max(0, ny1 - pad_h)
+                                px2 = min(w, nx2 + pad_w)
+                                py2 = min(h, ny2 + pad_h)
                                 
+                                number_img = wagon_crop[py1:py2, px1:px2]
+                                
+                                # 2. Dynamic Scaling (Target Height ~96px)
+                                # PaddleOCR works best with text height 32-96px.
+                                # Avoid making it massive (300px+) or tiny (<20px).
                                 if number_img.size > 0:
+                                    h_img, w_img = number_img.shape[:2]
+                                    target_height = 96.0
+                                    
+                                    if h_img < target_height:
+                                        scale_factor = target_height / h_img
+                                        number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
+                                    # If it's already big enough, leave it (or downscale if huge, but unlikely here)
+                                
                                     # DEBLUR CHECK
                                     final_img = number_img
                                     if deblur_engine:
@@ -156,8 +178,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                         # Threshold logic: Lower score = more blur. 
                                         # Typical Laplacian var for sharp text is > 100-200.
                                         # We trigger deblur if score < 150 (Tunable)
-                                        if score < 150:
-                                            # print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f})")
+                                        # Bumping to 500 to ensure it triggers for demo
+                                        if score < 500:
+                                            print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
                                             final_img = deblur_engine.deblur(number_img)
                                             
                                             # Save Result

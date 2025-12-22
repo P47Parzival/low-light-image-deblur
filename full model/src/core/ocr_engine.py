@@ -49,9 +49,16 @@ class WagonOCR:
                     text = line[1]
                 
                 # Filter noise: Wagon numbers usually have 5+ digits
-                # Adjusting logic based on Indian Wagon numbering (11 digits) or general robustness
-                if confidence > 0.6 and len(text) > 4:
+                # Relaxed: > 0.4 conf, > 0 chars (Show anything)
+                print(f"      [Paddle Raw] Text: '{text}' | Conf: {confidence:.2f}")
+                if confidence > 0.4 and len(text) >= 1:
                     detected_text.append(text)
 
+        if not detected_text:
+             print("      [OCR] No valid text found after filtering.")
+             return None
+
         # Return the most likely text (or join them if split across lines)
-        return " ".join(detected_text)
+        full_text = " ".join(detected_text)
+        print(f"      [Final Selection] {full_text}")
+        return full_text

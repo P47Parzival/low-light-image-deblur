@@ -68,7 +68,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         print(f"[WARNING] DeblurGAN weights not found at {deblur_model_path}. Running without deblurring.")
         
     deblur_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/DeblurredImg')
+    original_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OriginalImg')
     os.makedirs(deblur_save_dir, exist_ok=True)
+    os.makedirs(original_save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
     
@@ -135,12 +137,54 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                 # Validation
                 if x2<=x1 or y2<=y1: continue
                 
-                # Crop Wagon
+                # Crop Wagon (FULL CONTEXT)
                 wagon_crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
-                
-                # Run Model B on Crop
-                if frame_cnt % 3 == 0 and wagon_crop.size > 0:
+
+                if wagon_crop.size == 0:
+                    continue
+
+                # -----------------------------
+                # WAGON-LEVEL RESIZE (IMPORTANT)
+                # -----------------------------
+                # Ensure minimum spatial resolution for deblurring
+                if wagon_crop.shape[0] < 256:
+                    scale = 256 / wagon_crop.shape[0]
+                    wagon_crop = cv2.resize(
+                        wagon_crop,
+                        (int(wagon_crop.shape[1] * scale), 256),
+                        interpolation=cv2.INTER_CUBIC
+                    )
+
+                # -----------------------------
+                # WAGON-LEVEL DEBLUR (KEY FIX)
+                # -----------------------------
+                if deblur_engine:
+                    blur_score = calculate_blur_score(wagon_crop)
+
+                    # Use realistic thresholds for text motion blur
+                    if blur_score < 200:
+                        # -----------------------------
+                        # SAVE ORIGINAL (BLURRED) WAGON
+                        # -----------------------------
+
+                        wagon_blur = wagon_crop.copy()
+                        ts = int(time.time()*100)
+                        orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                        cv2.imwrite(orig_path, wagon_blur)
+
+                        print(f"[INFO] Deblurring wagon {wagon_id} | Blur score: {blur_score:.1f} | Size: {wagon_crop.shape[:2]}")
+                        wagon_crop = deblur_engine.deblur(wagon_crop)
+
+                        ts = int(time.time()*100)
+                        wagon_save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                        cv2.imwrite(wagon_save_path, wagon_crop)
+                    
+                # -----------------------------
+                # NOW run Model B on CLEAN wagon
+                # -----------------------------
+                if frame_cnt % 3 == 0:
                     results_b = model_b.predict(wagon_crop, verbose=False, conf=0.25)
+
                     
                     # If Number Found (Class 0 in Model B)
                     for r in results_b:
@@ -150,8 +194,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                             # Only trigger OCR once per wagon for now
                             if wagon_id not in ocr_requested:
                                 # 1. Add Padding (50%) - Sufficient context without too much noise
-                                pad_w = int((nx2 - nx1) * 0.5)
-                                pad_h = int((ny2 - ny1) * 0.5)
+                                pad_w = int((nx2 - nx1) * 1.2)
+                                pad_h = int((ny2 - ny1) * 1.0)
                                 px1 = max(0, nx1 - pad_w)
                                 py1 = max(0, ny1 - pad_h)
                                 px2 = min(w, nx2 + pad_w)
@@ -172,21 +216,30 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                     # If it's already big enough, leave it (or downscale if huge, but unlikely here)
                                 
                                     # DEBLUR CHECK
-                                    final_img = number_img
-                                    if deblur_engine:
-                                        score = calculate_blur_score(number_img)
+                                    # final_img = number_img
+                                    # if deblur_engine:
+                                    #     score = calculate_blur_score(number_img)
                                         # Threshold logic: Lower score = more blur. 
                                         # Typical Laplacian var for sharp text is > 100-200.
                                         # We trigger deblur if score < 150 (Tunable)
                                         # Bumping to 500 to ensure it triggers for demo
-                                        if score < 500:
-                                            print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
-                                            final_img = deblur_engine.deblur(number_img)
-                                            
-                                            # Save Result
-                                            ts = int(time.time()*100)
-                                            save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
-                                            cv2.imwrite(save_path, final_img)
+                                        # if score < 500:
+                                        #     print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
+                                        #     h_img, w_img = number_img.shape[:2]
+                                        #     if h_img < 64 or w_img < 128:
+                                        #         # Too small for deblurring – skip
+                                        #         final_img = number_img
+                                        #     else:
+                                        #         final_img = deblur_engine.deblur(number_img)
+
+                                        final_img = number_img
+
+                                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+
+                                        # Save Result
+                                        ts = int(time.time()*100)
+                                        save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                                        cv2.imwrite(save_path, final_img)
                                     
                                     ocr_in_q.put((wagon_id, final_img, time.time()))
                                     ocr_requested.add(wagon_id)

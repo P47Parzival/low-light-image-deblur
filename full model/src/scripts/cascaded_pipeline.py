@@ -102,6 +102,33 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
     wagon_data = {}
     ocr_requested = set()
 
+    # -----------------------------
+    # VIDEO DISPLAY SETTINGS (VLC-like)
+    # -----------------------------
+    # Get video properties
+    video_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    video_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    video_fps = cap.get(cv2.CAP_PROP_FPS)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    
+    # Calculate display size (fit to screen, max 1280x720 for comfortable viewing)
+    max_display_width = 1280
+    max_display_height = 720
+    scale = min(max_display_width / video_width, max_display_height / video_height, 1.0)
+    display_width = int(video_width * scale)
+    display_height = int(video_height * scale)
+    
+    # Create named window with specific properties
+    window_name = "Indian Railways - Freight Inspection System"
+    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+    cv2.resizeWindow(window_name, display_width, display_height)
+    
+    # Try to set window to be always on top and centered (Windows specific)
+    try:
+        cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
+    except:
+        pass
+        
     while cap.isOpened():
         success, frame = cap.read()
         if not success: break
@@ -113,7 +140,11 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         # STEP 1: Model A (Full Frame) - Detect Wagons
         # -----------------------------
         results_a = model_a.track(frame, persist=True, tracker="trackers/byte_track.yaml", verbose=False)
-        
+        # DEBUG: Print raw detections
+        if results_a and results_a[0].boxes.id is not None:
+             print(f"Raw Classes Detected: {results_a[0].boxes.cls.cpu().numpy()}")
+             print(f"Confidences: {results_a[0].boxes.conf.cpu().numpy()}")
+
         active_wagons_list = []
         if results_a and results_a[0].boxes.id is not None:
             boxes = results_a[0].boxes.xyxy.cpu().numpy()
@@ -122,7 +153,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
             
             for box, track_id, cls in zip(boxes, ids, clss):
                 track_id = int(track_id)
-                if int(cls) == 0: 
+                if int(cls) == 0 or int(cls) == 6:  # Assuming classes 0 and 6 are wagons
                     active_wagons_list.append((track_id, box))
                     unique_wagons.add(track_id)
 
@@ -162,7 +193,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                     blur_score = calculate_blur_score(wagon_crop)
 
                     # Use realistic thresholds for text motion blur
-                    if blur_score < 200:
+                    if blur_score < 1:
                         # -----------------------------
                         # SAVE ORIGINAL (BLURRED) WAGON
                         # -----------------------------
@@ -213,33 +244,20 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                     if h_img < target_height:
                                         scale_factor = target_height / h_img
                                         number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
-                                    # If it's already big enough, leave it (or downscale if huge, but unlikely here)
-                                
-                                    # DEBLUR CHECK
-                                    # final_img = number_img
-                                    # if deblur_engine:
-                                    #     score = calculate_blur_score(number_img)
-                                        # Threshold logic: Lower score = more blur. 
-                                        # Typical Laplacian var for sharp text is > 100-200.
-                                        # We trigger deblur if score < 150 (Tunable)
-                                        # Bumping to 500 to ensure it triggers for demo
-                                        # if score < 500:
-                                        #     print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
-                                        #     h_img, w_img = number_img.shape[:2]
-                                        #     if h_img < 64 or w_img < 128:
-                                        #         # Too small for deblurring – skip
-                                        #         final_img = number_img
-                                        #     else:
-                                        #         final_img = deblur_engine.deblur(number_img)
+                                    
+                                    # Initialize final_img safely
+                                    final_img = number_img
 
-                                        final_img = number_img
+                                    # User's Modified Deblur/Process Block
+                                    # (Preserving their commented out style or logical intent, but fixing scope)
+                                    # It seems they want detailEnhance.
+                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
 
-                                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
-
-                                        # Save Result
-                                        ts = int(time.time()*100)
-                                        save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
-                                        cv2.imwrite(save_path, final_img)
+                                    # Save Result
+                                    ts = int(time.time()*100)
+                                    # Ensure deblur_save_dir exists (it was created earlier)
+                                    save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                                    cv2.imwrite(save_path, final_img)
                                     
                                     ocr_in_q.put((wagon_id, final_img, time.time()))
                                     ocr_requested.add(wagon_id)
@@ -296,9 +314,58 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                  f"Det Time: {sum(metrics['det'])/len(metrics['det']):.0f}ms",
                  f"Count: {len(unique_wagons)}"]
         draw_stats(frame, stats)
+
+                # -----------------------------
+        # VLC-STYLE OVERLAY (Progress Bar + Info)
+        # -----------------------------
+        h, w = frame.shape[:2]
         
-        cv2.imshow("Cascaded Pipeline", frame)
-        if cv2.waitKey(1) == ord('q'): break
+        # Semi-transparent bottom bar (like VLC controls area)
+        overlay = frame.copy()
+        bar_height = 40
+        cv2.rectangle(overlay, (0, h - bar_height), (w, h), (30, 30, 30), -1)
+        frame = cv2.addWeighted(overlay, 0.7, frame, 0.3, 0)
+        
+        # Progress bar
+        progress = frame_cnt / total_frames if total_frames > 0 else 0
+        bar_y = h - 25
+        bar_start_x = 120
+        bar_end_x = w - 120
+        bar_width = bar_end_x - bar_start_x
+        
+        # Background bar (gray)
+        cv2.rectangle(frame, (bar_start_x, bar_y - 3), (bar_end_x, bar_y + 3), (80, 80, 80), -1)
+        # Progress bar (orange/yellow like VLC)
+        progress_x = int(bar_start_x + bar_width * progress)
+        cv2.rectangle(frame, (bar_start_x, bar_y - 3), (progress_x, bar_y + 3), (0, 165, 255), -1)
+        # Progress knob
+        cv2.circle(frame, (progress_x, bar_y), 6, (255, 255, 255), -1)
+        
+        # Time display (left side)
+        current_time_sec = frame_cnt / video_fps if video_fps > 0 else 0
+        total_time_sec = total_frames / video_fps if video_fps > 0 else 0
+        time_str = f"{int(current_time_sec // 60):02d}:{int(current_time_sec % 60):02d} / {int(total_time_sec // 60):02d}:{int(total_time_sec % 60):02d}"
+        cv2.putText(frame, time_str, (10, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+        
+        # Wagon count display (right side)
+        count_str = f"Wagons: {len(unique_wagons)}"
+        cv2.putText(frame, count_str, (w - 110, h - 12), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 1, cv2.LINE_AA)
+        
+        # Top banner (semi-transparent)
+        overlay_top = frame.copy()
+        cv2.rectangle(overlay_top, (0, 0), (w, 35), (30, 30, 30), -1)
+        frame = cv2.addWeighted(overlay_top, 0.7, frame, 0.3, 0)
+
+        
+        cv2.imshow(window_name, frame)
+        
+        # Keyboard controls (like VLC)
+        key = cv2.waitKey(1) & 0xFF
+        if key == ord('q') or key == 27:  # 'q' or ESC to quit 
+            break
+        elif key == ord(' '):  # Space to pause
+            print("[INFO] Paused. Press any key to continue...")
+            cv2.waitKey(0)
 
     ocr_in_q.put(None)
     ocr_p.join()
@@ -391,7 +458,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", required=True)
     # Default Paths
-    parser.add_argument("--model_a", default="railway_hackathon_take4/merged_model_v3/weights/best.pt")
+    parser.add_argument("--model_a", default="railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
     # Placeholder for Model B until user trains it
     parser.add_argument("--model_b", default="railway_hackathon_numbers/number_detector_v1/weights/best.pt")
     parser.add_argument("--deblur_model", default="NAFnet/NAFNet-GoPro-width32.pth")

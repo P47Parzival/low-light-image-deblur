@@ -3,6 +3,7 @@ import VideoFeed from './components/VideoFeed';
 import WagonDetails from './components/WagonDetails';
 import StatsPanel from './components/StatsPanel';
 import Navbar from './components/Navbar';
+import UploadView from './components/UploadView';
 
 function App() {
   const [activeTab, setActiveTab] = useState('Live');
@@ -20,10 +21,6 @@ function App() {
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
               <div>
                 <h1 className="text-4xl font-bold text-white mb-2">Live Inspection Dashboard</h1>
-                <p className="text-gray-400 max-w-xl">
-                  Real-time motion blur mitigation and wagon defect detection system.
-                  Running zero-latency edge processing.
-                </p>
               </div>
               <div className="flex gap-3">
                 <button className="px-4 py-2 bg-white text-black font-semibold rounded-lg hover:bg-gray-200 transition-colors">
@@ -58,13 +55,17 @@ function App() {
           </>
         ) : (
           /* Placeholder Pages */
-          <div className="flex flex-col items-center justify-center py-32 space-y-4 border border-white/5 rounded-2xl bg-white/5">
-            <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 text-2xl">
-              {activeTab === 'Upload' ? '📂' : '📜'}
+          activeTab === 'Upload' ? (
+            <UploadView />
+          ) : (
+            <div className="flex flex-col items-center justify-center py-32 space-y-4 border border-white/5 rounded-2xl bg-white/5">
+              <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 text-2xl">
+                📜
+              </div>
+              <h2 className="text-2xl font-bold text-white">{activeTab} Section</h2>
+              <p className="text-gray-400">This module is currently under development.</p>
             </div>
-            <h2 className="text-2xl font-bold text-white">{activeTab} Section</h2>
-            <p className="text-gray-400">This module is currently under development.</p>
-          </div>
+          )
         )}
       </main>
     </div>

@@ -4,6 +4,7 @@ import WagonDetails from './components/WagonDetails';
 import StatsPanel from './components/StatsPanel';
 import Navbar from './components/Navbar';
 import UploadView from './components/UploadView';
+import HistoryView from './components/HistoryView';
 
 function App() {
   const [activeTab, setActiveTab] = useState('Live');
@@ -57,6 +58,8 @@ function App() {
           /* Placeholder Pages */
           activeTab === 'Upload' ? (
             <UploadView />
+          ) : activeTab === 'History' ? (
+            <HistoryView />
           ) : (
             <div className="flex flex-col items-center justify-center py-32 space-y-4 border border-white/5 rounded-2xl bg-white/5">
               <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center text-gray-500 text-2xl">

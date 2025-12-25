@@ -5,6 +5,7 @@ import os
 import argparse
 import multiprocessing as mp
 import time
+import queue
 from collections import deque
 import numpy as np
 
@@ -16,6 +17,7 @@ from src.core.indian_railways import IndianWagonParser
 from src.scripts.pipeline_viz import draw_stats, draw_track
 from src.core.deblur_engine import DeblurGANEngine
 from src.core.blur_metric import calculate_blur_score
+import src.core.database as database
 
 # -----------------------------
 # OCR Processing (CPU)
@@ -26,7 +28,8 @@ def ocr_worker(input_queue, output_queue):
         item = input_queue.get()
         if item is None: break
         
-        wagon_id, crop, req_time = item
+        # New Unpacking: Added paths
+        wagon_id, crop, req_time, orig_path, deblur_path = item
         
         # In a real scenario, DeblurGAN would run here before OCR
         
@@ -34,10 +37,10 @@ def ocr_worker(input_queue, output_queue):
         
         if raw_text:
             parsed = IndianWagonParser.parse(raw_text)
-            output_queue.put((wagon_id, raw_text, parsed, req_time))
+            output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path))
         else:
             print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
-            output_queue.put((wagon_id, "OCR Failed", None, req_time))
+            output_queue.put((wagon_id, "OCR Failed", None, req_time, orig_path, deblur_path))
 
 # -----------------------------
 # Cascaded Pipeline
@@ -92,6 +95,11 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
     log_file_path = os.path.join(output_dir, f"{timestamp_str}.txt")
     
     print(f"[INFO] Report will be properly generated at: {log_file_path}")
+
+    # Database Init
+    database.init_db()
+    inspection_id = database.create_inspection(os.path.basename(video_path))
+    print(f"[INFO] Inspection Run ID: {inspection_id}")
 
     # Data Buffers
     unique_wagons = set()
@@ -199,6 +207,16 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                         interpolation=cv2.INTER_CUBIC
                     )
 
+                # Initialize Paths & Timestamp (Unified)
+                ts = int(time.time()*100)
+                orig_path = ""
+                deblur_path = ""
+                
+                # Make directories absolute
+                deblur_save_dir = os.path.abspath(deblur_save_dir)
+                original_save_dir = os.path.abspath(original_save_dir)
+                ocr_save_dir = os.path.abspath(ocr_save_dir)
+
                 # -----------------------------
                 # WAGON-LEVEL DEBLUR (KEY FIX)
                 # -----------------------------
@@ -212,16 +230,17 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                         # -----------------------------
 
                         wagon_blur = wagon_crop.copy()
-                        ts = int(time.time()*100)
+                        # Use unified 'ts'
                         orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
                         cv2.imwrite(orig_path, wagon_blur)
 
                         print(f"[INFO] Deblurring wagon {wagon_id} | Blur score: {blur_score:.1f} | Size: {wagon_crop.shape[:2]}")
                         wagon_crop = deblur_engine.deblur(wagon_crop)
 
-                        ts = int(time.time()*100)
+                        # Save Deburred using same 'ts'
                         wagon_save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
                         cv2.imwrite(wagon_save_path, wagon_crop)
+                        deblur_path = wagon_save_path
                     
                 # -----------------------------
                 # NOW run Model B on CLEAN wagon
@@ -258,7 +277,27 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                         scale_factor = target_height / h_img
                                         number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
                                     
-                                    # Initialize final_img safely
+                                    # Initialize Paths (Important for DB)
+                                    orig_path = ""
+                                    deblur_path = ""
+                                    
+                                    # DEBLUR CHECK
+                                    # final_img = number_img
+                                    # if deblur_engine:
+                                    #     score = calculate_blur_score(number_img)
+                                        # Threshold logic: Lower score = more blur. 
+                                        # Typical Laplacian var for sharp text is > 100-200.
+                                        # We trigger deblur if score < 150 (Tunable)
+                                        # Bumping to 500 to ensure it triggers for demo
+                                        # if score < 500:
+                                        #     print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
+                                        #     h_img, w_img = number_img.shape[:2]
+                                        #     if h_img < 64 or w_img < 128:
+                                        #         # Too small for deblurring – skip
+                                        #         final_img = number_img
+                                        #     else:
+                                        #         final_img = deblur_engine.deblur(number_img)
+
                                     final_img = number_img
 
                                     # User's Modified Deblur/Process Block
@@ -266,13 +305,22 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                     # It seems they want detailEnhance.
                                     final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
 
+                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+
                                     # Save Result
-                                    ts = int(time.time()*100)
-                                    # Ensure deblur_save_dir exists (it was created earlier)
+                                    # Use unified 'ts'
                                     save_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
                                     cv2.imwrite(save_path, final_img)
                                     
-                                    ocr_in_q.put((wagon_id, final_img, time.time()))
+                                    # Fallback logic for DB paths
+                                    # If deblur didn't happen, use the OCR crop path as placeholder 
+                                    # so the DB has *something* to show.
+                                    if not deblur_path:
+                                        deblur_path = save_path
+                                    if not orig_path:
+                                         orig_path = save_path 
+                                    
+                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path))
                                     ocr_requested.add(wagon_id)
                                     
                             # Visualization
@@ -286,22 +334,50 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         # -----------------------------
         # STEP 3: Check OCR & Buffer Data
         # -----------------------------
-        while not ocr_out_q.empty():
-            tid, raw, parsed, req_t = ocr_out_q.get()
-            metrics['ocr'].append((time.time()-req_t)*1000)
-            
-            # Timestamp for this specific detection
-            det_time = datetime.datetime.now().strftime("%H:%M:%S")
-            wagon_data[tid] = {'raw': raw, 'parsed': parsed}
-            
-            # Add to consist log if not already there (or update)
-            # We use track_id as unique key for now
-            consist_log.append({
-                'id': tid,
-                'raw': raw,
-                'parsed': parsed,
-                'timestamp': det_time
-            })
+        while True:
+            try:
+                # Non-blocking get. If empty, raises queue.Empty immediately.
+                item = ocr_out_q.get_nowait()
+                
+                # Unpack 6 items (CORRECTED)
+                wagon_id, raw_text, parsed, req_time, orig_path, deblur_path = item
+                
+                # Calculate Latency
+                latency = time.time() - req_time
+                metrics['ocr'].append(latency)
+                
+                # Timestamp for this specific detection
+                det_time = datetime.datetime.now().strftime("%H:%M:%S")
+                wagon_data[wagon_id] = {'raw': raw_text, 'parsed': parsed}
+                
+                # Formatted Output
+                parsed_str = str(parsed) if parsed else "Invalid"
+                
+                log_entry = f"[{det_time}] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str} | Latency: {latency:.2f}s"
+                print(log_entry)
+                
+                consist_log.append({
+                    'id': wagon_id,
+                    'raw': raw_text, 
+                    'parsed': parsed,
+                    'timestamp': det_time
+                })
+
+                # DB Log (Using Actual Paths)
+                database.add_wagon(
+                    inspection_id=inspection_id,
+                    wagon_index=wagon_id,
+                    ocr_text=raw_text,
+                    ocr_conf=0.99 if raw_text != "OCR Failed" else 0.0,
+                    orig_path=orig_path or "",
+                    deblur_path=deblur_path or "",
+                    defects="None",
+                    is_night=False 
+                )
+
+            except queue.Empty:
+                # Continue main video loop if no OCR result ready
+                break
 
 
         # -----------------------------

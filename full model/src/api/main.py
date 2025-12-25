@@ -1,12 +1,19 @@
 from fastapi import FastAPI
 from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 import cv2
 import yt_dlp
 import uvicorn
 import asyncio
 import random
 import time
+import os
+import sys
+
+# Import Database Module
+sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
+import database
 
 app = FastAPI()
 
@@ -18,14 +25,66 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+# Serve Static Files (Images)
+# The pipeline saves images to:
+# - .../full model/detection
+# - .../full model/DeblurredImg
+# - .../full model/OriginalImg
+# - .../full model/OCRimage
+# We mount the 'full model' parent directory (project root) so we can access all of them.
+# Fix: Use '../../' to go to root. Do NOT append 'full model' again.
+full_model_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../'))
+os.makedirs(full_model_dir, exist_ok=True)
+app.mount("/static", StaticFiles(directory=full_model_dir), name="static")
 
-# Global Mock Data
+# Global Mock Data (Still used for live stats for now)
 mock_stats = {
     "total_wagons": 0,
     "last_wagon_id": "N/A",
     "defects_found": 0,
     "status": "Idle"
 }
+
+# ... (YouTube functions remain same, skipping for brevity in this replace block if possible, but replace_file_content replaces chunks)
+# I will keep the existing imports and setup, just adding the new routes.
+
+@app.get("/history")
+async def get_history():
+    """Get list of all past inspections."""
+    return database.get_all_inspections()
+
+@app.get("/history/{inspection_id}")
+async def get_inspection_details(inspection_id: int):
+    """Get all wagons for a specific inspection."""
+    wagons = database.get_wagons_for_inspection(inspection_id)
+    
+    clean_wagons = []
+    for w in wagons:
+        w_dict = dict(w)
+        # Convert absolute path to static URL
+        # Logic: find 'full model' in path and take everything after it
+        for key in ['original_image_path', 'deblurred_image_path', 'cropped_number_path']:
+             # Note: API might return keys slightly differently depending on DB row factory
+             # But let's assume keys match schema
+            val = w_dict.get(key)
+            if val and isinstance(val, str) and 'full model' in val:
+                # abs_path: C:\Users\dhruv\...\full model\DeblurredImg\wagon_1_123.jpg
+                # rel_path: DeblurredImg/wagon_1_123.jpg
+                
+                # Split by 'full model' (ignoring case if possible, but usually FS matches)
+                # We use simple split assuming standard installation
+                parts = val.split('full model')
+                if len(parts) > 1:
+                    rel_path = parts[-1].replace('\\', '/').lstrip('/')
+                    w_dict[key] = f"http://localhost:8000/static/{rel_path}"
+        
+        clean_wagons.append(w_dict)
+        
+    return clean_wagons
+
+@app.get("/stats")
+async def get_stats():
+    return mock_stats
 
 def get_youtube_stream_url(youtube_url: str) -> str:
     ydl_opts = {
@@ -58,7 +117,7 @@ def generate_frames(url_key):
     # Simulate processing loop
     while True:
         success, frame = cap.read()
-        print("Frame read:", success)
+        # print("Frame read:", success)
         if not success:
             # If video ends, try to reconnect
             print(f"Stream {url_key} ended, restarting...")

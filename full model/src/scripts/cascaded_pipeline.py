@@ -69,8 +69,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         
     deblur_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/DeblurredImg')
     original_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OriginalImg')
+    ocr_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OCRimage')
     os.makedirs(deblur_save_dir, exist_ok=True)
     os.makedirs(original_save_dir, exist_ok=True)
+    os.makedirs(ocr_save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
     
@@ -154,8 +156,19 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
             for box, track_id, cls in zip(boxes, ids, clss):
                 track_id = int(track_id)
                 if int(cls) == 0 or int(cls) == 6:  # Assuming classes 0 and 6 are wagons
-                    active_wagons_list.append((track_id, box))
-                    unique_wagons.add(track_id)
+                    # RULE 1: Area-based filtering
+                    # Wagon box area: 5% – 35% (User requested 3% - 40%)
+                    x1, y1, x2, y2 = box
+                    box_area = (x2 - x1) * (y2 - y1)
+                    image_area = video_width * video_height
+                    ratio = box_area / image_area
+
+                    if 0.03 < ratio < 0.40:
+                        active_wagons_list.append((track_id, box))
+                        unique_wagons.add(track_id)
+                    else:
+                        pass
+                        # print(f"[DEBUG] Filtered box {track_id} with area ratio {ratio:.3f}")
 
         # -----------------------------
         # STEP 2: Model B (Crops) - Detect Numbers
@@ -256,7 +269,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                     # Save Result
                                     ts = int(time.time()*100)
                                     # Ensure deblur_save_dir exists (it was created earlier)
-                                    save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
+                                    save_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
                                     cv2.imwrite(save_path, final_img)
                                     
                                     ocr_in_q.put((wagon_id, final_img, time.time()))

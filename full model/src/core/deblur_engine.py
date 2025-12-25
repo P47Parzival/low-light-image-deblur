@@ -46,24 +46,48 @@ class DeblurGANEngine:
     def deblur(self, image: np.ndarray) -> np.ndarray:
         """
         Takes a BGR image (numpy), deblurs it, and returns BGR image.
+        Includes Padding and Test-Time Augmentation (TTA) for better quality.
         """
         if self.model is None:
             return image
         
         h, w = image.shape[:2]
         
-        # Preprocess: BGR -> RGB, Normalize 0 to 1, Batch Dimension, Tensor
-        img_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        img_tensor = torch.from_numpy(img_rgb).float() / 255.0
-        img_tensor = img_tensor.permute(2, 0, 1).unsqueeze(0).to(self.device)
+        # 1. Pad image to be a multiple of 32
+        # This prevents edge artifacts and ensures the network architecture aligns correctly
+        pad_h = (32 - h % 32) % 32
+        pad_w = (32 - w % 32) % 32
+        img_padded = np.pad(image, ((0, pad_h), (0, pad_w), (0, 0)), mode='reflect')
+
+        def run_inference(img_in):
+            # Preprocess: BGR -> RGB, Normalize 0 to 1, Batch Dimension, Tensor
+            img_rgb = cv2.cvtColor(img_in, cv2.COLOR_BGR2RGB)
+            img_tensor = torch.from_numpy(img_rgb).float() / 255.0
+            img_tensor = img_tensor.permute(2, 0, 1).unsqueeze(0).to(self.device)
+            
+            # Inference
+            with torch.no_grad():
+                output_tensor = self.model(img_tensor)
+            
+            # Postprocess: Tensor -> Numpy (Float 0..1)
+            output = output_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
+            return output
+
+        # 2. Run inference (Original)
+        out_1 = run_inference(img_padded)
+
+        # 3. Run inference (Flipped - Test Time Augmentation)
+        # This helps recover details by processing the image from a different orientation
+        img_flipped = cv2.flip(img_padded, 1)
+        out_2 = run_inference(img_flipped)
+        out_2 = cv2.flip(out_2, 1)
+
+        # 4. Average the results for higher quality
+        final_output = (out_1 + out_2) / 2.0
         
-        # Inference
-        with torch.no_grad():
-            output_tensor = self.model(img_tensor)
+        # 5. Convert back to BGR and uint8
+        final_output = np.clip(final_output * 255.0, 0, 255).astype(np.uint8)
+        output_bgr = cv2.cvtColor(final_output, cv2.COLOR_RGB2BGR)
         
-        # Postprocess: Tensor -> Numpy, 0..1 -> 0..255, RGB -> BGR
-        output = output_tensor.squeeze().permute(1, 2, 0).cpu().numpy()
-        output = np.clip(output * 255.0, 0, 255).astype(np.uint8)
-        output_bgr = cv2.cvtColor(output, cv2.COLOR_RGB2BGR)
-        
-        return output_bgr
+        # 6. Crop padding to return original size
+        return output_bgr[:h, :w, :]

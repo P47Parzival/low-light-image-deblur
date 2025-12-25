@@ -37,17 +37,17 @@ const WagonDetails: React.FC<WagonDetailsProps> = ({ streamId }) => {
                 </div>
             </div>
 
-            {/* Damage Flags */}
+            {/* Damage Assessment */}
             <div className="space-y-2">
-                <h5 className="text-xs font-semibold text-gray-500 uppercase">Damage Assessment</h5>
+                <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Damage Assessment</h5>
                 {mockData.defects.length > 0 ? (
                     <div className="flex flex-wrap gap-2">
                         {mockData.defects.map((d, i) => (
-                            <span key={i} className="text-xs bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-1 rounded">
+                            <span key={i} className="text-xs bg-red-500/10 text-red-500 border border-red-500/20 px-2 py-1 rounded flex items-center gap-1">
                                 ⚠️ {d}
                             </span>
                         ))}
-                        <span className="text-xs text-red-400 font-bold ml-auto">Severity: {mockData.severity}</span>
+                        <span className="text-xs text-red-400 font-bold ml-auto self-center">Severity: {mockData.severity}</span>
                     </div>
                 ) : (
                     <div className="flex items-center gap-2 text-green-500 text-sm">
@@ -56,18 +56,75 @@ const WagonDetails: React.FC<WagonDetailsProps> = ({ streamId }) => {
                 )}
             </div>
 
-            {/* Thumbnails (Placeholder) */}
+            {/* Damage Frames */}
             <div className="grid grid-cols-2 gap-2">
                 <div className="space-y-1">
-                    <span className="text-[10px] text-gray-500 uppercase">Input Frame (Blurry)</span>
+                    <span className="text-[10px] text-gray-500 uppercase">Damaged Part 1</span>
                     <div className="w-full h-20 bg-gray-800 rounded border border-white/5 flex items-center justify-center text-gray-600 text-xs italic">
                         Placeholder
                     </div>
                 </div>
                 <div className="space-y-1">
-                    <span className="text-[10px] text-blue-400 uppercase">Enhanced (Sharp)</span>
+                    <span className="text-[10px] text-blue-400 uppercase">Damaged Part 2</span>
                     <div className="w-full h-20 bg-gray-800 rounded border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs italic">
                         Placeholder
+                    </div>
+                </div>
+            </div>
+
+            {/* Blur Assessment */}
+            <div className="space-y-2 pt-2 border-t border-gray-800/50">
+                <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Blur Mitigation</h5>
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                        <span className="text-[10px] text-gray-500 uppercase">Input (Blurry)</span>
+                        <div className="w-full h-20 bg-gray-800 rounded border border-white/5 flex items-center justify-center text-gray-600 text-xs italic">
+                            Placeholder
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-[10px] text-blue-400 uppercase">Output (Sharp)</span>
+                        <div className="w-full h-20 bg-gray-800 rounded border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs italic">
+                            Placeholder
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* OCR */}
+            <div className="space-y-2 pt-2 border-t border-gray-800/50">
+                <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">OCR Analysis</h5>
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                        <span className="text-[10px] text-gray-500 uppercase">Cropped Text</span>
+                        <div className="w-full h-20 bg-gray-800 rounded border border-white/5 flex items-center justify-center text-gray-600 text-xs italic">
+                            Placeholder
+                        </div>
+                    </div>
+                    <div className="space-y-1 flex flex-col justify-center">
+                        <span className="text-[10px] text-gray-500 uppercase">Detected ID</span>
+                        <div className="text-lg font-mono font-bold text-white tracking-widest">
+                            {mockData.wagonId}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {/* Low Light Enhancement */}
+            <div className="space-y-2 pt-2 border-t border-gray-800/50">
+                <h5 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Low Light Enhancement</h5>
+                <div className="grid grid-cols-2 gap-2">
+                    <div className="space-y-1">
+                        <span className="text-[10px] text-gray-500 uppercase">Original (Dark)</span>
+                        <div className="w-full h-20 bg-gray-800 rounded border border-white/5 flex items-center justify-center text-gray-600 text-xs italic">
+                            Placeholder
+                        </div>
+                    </div>
+                    <div className="space-y-1">
+                        <span className="text-[10px] text-blue-400 uppercase">Enhanced (Bright)</span>
+                        <div className="w-full h-20 bg-gray-800 rounded border border-blue-500/30 flex items-center justify-center text-blue-400 text-xs italic">
+                            Placeholder
+                        </div>
                     </div>
                 </div>
             </div>

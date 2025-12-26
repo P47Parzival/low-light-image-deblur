@@ -14,6 +14,8 @@ import sys
 # Import Database Module
 sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
 import database
+import report_generator
+from fastapi.responses import Response
 
 app = FastAPI()
 
@@ -52,6 +54,28 @@ mock_stats = {
 async def get_history():
     """Get list of all past inspections."""
     return database.get_all_inspections()
+
+@app.get("/history/{inspection_id}/report")
+async def generate_report_pdf(inspection_id: int):
+    """Generate and download PDF report for an inspection."""
+    inspection = database.get_inspection_by_id(inspection_id)
+    if not inspection:
+        return Response(content="Inspection not found", status_code=404)
+        
+    wagons = database.get_wagons_for_inspection(inspection_id)
+    
+    # Generate PDF
+    pdf = report_generator.generate_report(inspection, wagons)
+    
+    # Output to bytes
+    # output(dest='S') returns the document as a string (latin-1 encoding).
+    # We need to encode it to bytes.
+    pdf_bytes = pdf.output(dest='S').encode('latin-1')
+    
+    headers = {
+        'Content-Disposition': f'attachment; filename="report_{inspection_id}.pdf"'
+    }
+    return Response(content=pdf_bytes, media_type="application/pdf", headers=headers)
 
 @app.get("/history/{inspection_id}")
 async def get_inspection_details(inspection_id: int):

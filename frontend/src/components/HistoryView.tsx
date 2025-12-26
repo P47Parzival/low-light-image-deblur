@@ -85,15 +85,31 @@ const HistoryView: React.FC = () => {
                                 <span className="w-2 h-2 rounded-full bg-blue-500"></span>
                                 <span className="text-sm text-gray-400">Analysis Complete</span>
                             </div>
+
+                            {/* Download Button */}
+                            <div className="mt-4 pt-4 border-t border-gray-700 flex justify-end">
+                                <button
+                                    onClick={(e) => {
+                                        e.stopPropagation(); // Prevent card click
+                                        window.open(`http://localhost:8000/history/${insp.id}/report`, '_blank');
+                                    }}
+                                    className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
+                                >
+                                    <span>📄</span> Download Report
+                                </button>
+                            </div>
                         </div>
-                    ))}
-                    {inspections.length === 0 && (
-                        <div className="col-span-full py-12 text-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
-                            No inspection history found. Run the pipeline to generate data.
-                        </div>
-                    )}
-                </div>
-            </div>
+                    ))
+                    }
+                    {
+                        inspections.length === 0 && (
+                            <div className="col-span-full py-12 text-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
+                                No inspection history found. Run the pipeline to generate data.
+                            </div>
+                        )
+                    }
+                </div >
+            </div >
         );
     }
 

@@ -91,3 +91,14 @@ def get_wagons_for_inspection(inspection_id):
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+def get_inspection_by_id(inspection_id):
+    """Fetch a single inspection by its ID."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    cursor.execute('SELECT * FROM inspections WHERE id = ?', (inspection_id,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None

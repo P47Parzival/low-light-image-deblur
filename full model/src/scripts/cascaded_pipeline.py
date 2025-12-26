@@ -28,8 +28,8 @@ def ocr_worker(input_queue, output_queue):
         item = input_queue.get()
         if item is None: break
         
-        # New Unpacking: Added paths
-        wagon_id, crop, req_time, orig_path, deblur_path = item
+        # New Unpacking: Added ocr_path
+        wagon_id, crop, req_time, orig_path, deblur_path, ocr_path = item
         
         # In a real scenario, DeblurGAN would run here before OCR
         
@@ -37,10 +37,11 @@ def ocr_worker(input_queue, output_queue):
         
         if raw_text:
             parsed = IndianWagonParser.parse(raw_text)
-            output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path))
+            output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path))
         else:
             print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
-            output_queue.put((wagon_id, "OCR Failed", None, req_time, orig_path, deblur_path))
+            # Still pass paths so we can see the failed image
+            output_queue.put((wagon_id, "OCR Failed", None, req_time, orig_path, deblur_path, ocr_path))
 
 # -----------------------------
 # Cascaded Pipeline
@@ -320,7 +321,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                     if not orig_path:
                                          orig_path = save_path 
                                     
-                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path))
+                                    # Pass 'save_path' as 'ocr_path'
+                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, save_path))
                                     ocr_requested.add(wagon_id)
                                     
                             # Visualization
@@ -339,8 +341,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                 # Non-blocking get. If empty, raises queue.Empty immediately.
                 item = ocr_out_q.get_nowait()
                 
-                # Unpack 6 items (CORRECTED)
-                wagon_id, raw_text, parsed, req_time, orig_path, deblur_path = item
+                # Unpack 7 items (CORRECTED)
+                wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path = item
                 
                 # Calculate Latency
                 latency = time.time() - req_time
@@ -371,6 +373,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                     ocr_conf=0.99 if raw_text != "OCR Failed" else 0.0,
                     orig_path=orig_path or "",
                     deblur_path=deblur_path or "",
+                    ocr_path=ocr_path or "",
                     defects="None",
                     is_night=False 
                 )

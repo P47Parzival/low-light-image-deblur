@@ -216,6 +216,18 @@ const HistoryView: React.FC = () => {
                                                 </div>
                                             </div>
                                         </div>
+
+                                        {/* OCR Crop Row */}
+                                        <div className="mt-4 pt-4 border-t border-gray-800">
+                                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">OCR Region</h4>
+                                            <div className="bg-black/40 rounded-lg border border-white/10 h-[120px] flex items-center justify-center relative overflow-hidden group">
+                                                {wagon.cropped_number_path ? (
+                                                    <img src={wagon.cropped_number_path} className="h-full object-contain" alt="OCR Crop" />
+                                                ) : (
+                                                    <span className="text-xs text-gray-500 italic">No OCR Data</span>
+                                                )}
+                                            </div>
+                                        </div>
                                     </div>
 
                                 </div>

@@ -55,7 +55,7 @@ def create_inspection(video_name):
     conn.close()
     return inspection_id
 
-def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, defects, is_night):
+def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, defects, is_night):
     """Add a wagon record to the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -63,9 +63,9 @@ def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute('''
         INSERT INTO wagons 
-        (inspection_id, wagon_index, ocr_text, ocr_confidence, original_image_path, deblurred_image_path, defects, is_night, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, str(defects), is_night, timestamp))
+        (inspection_id, wagon_index, ocr_text, ocr_confidence, original_image_path, deblurred_image_path, cropped_number_path, defects, is_night, timestamp)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, str(defects), is_night, timestamp))
     
     conn.commit()
     conn.close()

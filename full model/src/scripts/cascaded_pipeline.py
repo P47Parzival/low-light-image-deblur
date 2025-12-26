@@ -46,7 +46,7 @@ def ocr_worker(input_queue, output_queue):
 # -----------------------------
 # Cascaded Pipeline
 # -----------------------------
-def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path):
+def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None):
     if not os.path.exists(video_path): return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
@@ -99,7 +99,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
 
     # Database Init
     database.init_db()
-    inspection_id = database.create_inspection(os.path.basename(video_path))
+    if inspection_id is None:
+        inspection_id = database.create_inspection(os.path.basename(video_path))
     print(f"[INFO] Inspection Run ID: {inspection_id}")
 
     # Data Buffers
@@ -130,15 +131,16 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
     display_height = int(video_height * scale)
     
     # Create named window with specific properties
-    window_name = "Indian Railways - Freight Inspection System"
-    cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-    cv2.resizeWindow(window_name, display_width, display_height)
-    
-    # Try to set window to be always on top and centered (Windows specific)
-    try:
-        cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
-    except:
-        pass
+    if not headless:
+        window_name = "Indian Railways - Freight Inspection System"
+        cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+        cv2.resizeWindow(window_name, display_width, display_height)
+        
+        # Try to set window to be always on top and centered (Windows specific)
+        try:
+            cv2.setWindowProperty(window_name, cv2.WND_PROP_TOPMOST, 1)
+        except:
+            pass
         
     while cap.isOpened():
         success, frame = cap.read()
@@ -150,7 +152,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         # -----------------------------
         # STEP 1: Model A (Full Frame) - Detect Wagons
         # -----------------------------
-        results_a = model_a.track(frame, persist=True, tracker="trackers/byte_track.yaml", verbose=False)
+        results_a = model_a.track(frame, persist=True, tracker="../../trackers/byte_track.yaml", verbose=False)
         # DEBUG: Print raw detections
         if results_a and results_a[0].boxes.id is not None:
              print(f"Raw Classes Detected: {results_a[0].boxes.cls.cpu().numpy()}")
@@ -248,8 +250,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                 # -----------------------------
                 if frame_cnt % 3 == 0:
                     results_b = model_b.predict(wagon_crop, verbose=False, conf=0.25)
-
                     
+                    # DEBUG: Log results
+                    print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
+
                     # If Number Found (Class 0 in Model B)
                     for r in results_b:
                         for nbox in r.boxes.xyxy:
@@ -322,6 +326,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                                          orig_path = save_path 
                                     
                                     # Pass 'save_path' as 'ocr_path'
+                                    print(f"[DEBUG] Queueing OCR for Wagon {wagon_id}")
                                     ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, save_path))
                                     ocr_requested.add(wagon_id)
                                     
@@ -366,6 +371,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
                 })
 
                 # DB Log (Using Actual Paths)
+                print(f"[DEBUG] Adding Wagon {wagon_id} to DB...")
                 database.add_wagon(
                     inspection_id=inspection_id,
                     wagon_index=wagon_id,
@@ -449,20 +455,22 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
         frame = cv2.addWeighted(overlay_top, 0.7, frame, 0.3, 0)
 
         
-        cv2.imshow(window_name, frame)
-        
-        # Keyboard controls (like VLC)
-        key = cv2.waitKey(1) & 0xFF
-        if key == ord('q') or key == 27:  # 'q' or ESC to quit 
-            break
-        elif key == ord(' '):  # Space to pause
-            print("[INFO] Paused. Press any key to continue...")
-            cv2.waitKey(0)
+        if not headless:
+            cv2.imshow(window_name, frame)
+            
+            # Keyboard controls (like VLC)
+            key = cv2.waitKey(1) & 0xFF
+            if key == ord('q') or key == 27:  # 'q' or ESC to quit 
+                break
+            elif key == ord(' '):  # Space to pause
+                print("[INFO] Paused. Press any key to continue...")
+                cv2.waitKey(0)
 
     ocr_in_q.put(None)
     ocr_p.join()
     cap.release()
-    cv2.destroyAllWindows()
+    if not headless:
+        cv2.destroyAllWindows()
     
     # ---------------------------------------------------------
     # Generate Final Report
@@ -544,6 +552,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path)
     print(f"[SUMMARY] Total Wagons Counted: {total_wagons}")
     print(f"[SUMMARY] Report saved to: {log_file_path}")
     print("-" * 50)
+    
+    # Mark as Completed
+    database.update_inspection_status(inspection_id, "COMPLETED")
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)

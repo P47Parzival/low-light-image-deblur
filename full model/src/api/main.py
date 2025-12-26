@@ -15,9 +15,17 @@ import sys
 sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
 import database
 import report_generator
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks
 from fastapi.responses import Response
 
+# Import Pipeline
+sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
+from cascaded_pipeline import cascaded_pipeline
+
 app = FastAPI()
+
+# Initialize DB (Run Migrations)
+database.init_db()
 
 # Enable CORS for frontend
 app.add_middleware(
@@ -54,6 +62,67 @@ mock_stats = {
 async def get_history():
     """Get list of all past inspections."""
     return database.get_all_inspections()
+
+@app.post("/upload")
+async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+    """Upload a video and automatically trigger processing."""
+    try:
+        # Define Paths
+        base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
+        video_dir = os.path.join(base_dir, 'Video')
+        os.makedirs(video_dir, exist_ok=True)
+        
+        file_path = os.path.join(video_dir, file.filename)
+        
+        # Save File
+        with open(file_path, "wb") as f:
+            content = await file.read()
+            f.write(content)
+            
+        print(f"[API] Video saved to: {file_path}")
+        
+        # Define Model Paths
+        model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
+        model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
+        deblur_model = os.path.join(base_dir, "NAFnet/NAFNet-GoPro-width64.pth")
+        
+        # Create Inspection Record BEFORE processing (so frontend has an ID)
+        inspection_id = database.create_inspection(file.filename)
+        
+        # Trigger Pipeline in Background
+        background_tasks.add_task(
+            cascaded_pipeline, 
+            video_path=file_path,
+            model_a_path=model_a,
+            model_b_path=model_b,
+            deblur_model_path=deblur_model,
+            headless=True,
+            inspection_id=inspection_id
+        )
+        
+        return {
+            "message": "Upload successful. Processing started in background.", 
+            "filename": file.filename,
+            "inspection_id": inspection_id,
+            "status": "PROCESSING"
+        }
+        
+    except Exception as e:
+        print(f"Error during upload: {e}")
+        return Response(content=f"Upload failed: {str(e)}", status_code=500)
+
+@app.get("/inspections/{inspection_id}/status")
+async def get_inspection_status(inspection_id: int):
+    """Check the status of a specific inspection."""
+    insp = database.get_inspection_by_id(inspection_id)
+    if not insp:
+        return Response(content="Inspection not found", status_code=404)
+    
+    # If status column missing (migration edge case), assume completed if wagons exist?
+    # Or just default to COMPLETED if not PROCESSING?
+    status = insp.get('status', 'COMPLETED') 
+    return {"status": status}
+
 
 @app.get("/history/{inspection_id}/report")
 async def generate_report_pdf(inspection_id: int):

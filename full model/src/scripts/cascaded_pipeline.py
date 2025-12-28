@@ -112,6 +112,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     prev_time = time.time()
     metrics = {'fps': deque(maxlen=50), 'det': deque(maxlen=50), 'ocr': deque(maxlen=50)}
     wagon_data = {}
+    wagon_image_cache = {}
     ocr_requested = set()
 
     # -----------------------------
@@ -210,10 +211,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                         interpolation=cv2.INTER_CUBIC
                     )
 
-                # Initialize Paths & Timestamp (Unified)
+                # Initialize timestamp and cache structure
                 ts = int(time.time()*100)
-                orig_path = ""
-                deblur_path = ""
                 
                 # Make directories absolute
                 deblur_save_dir = os.path.abspath(deblur_save_dir)
@@ -221,30 +220,33 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 ocr_save_dir = os.path.abspath(ocr_save_dir)
 
                 # -----------------------------
-                # WAGON-LEVEL DEBLUR (KEY FIX)
+                # CACHE: Prepare Images (In-Memory)
                 # -----------------------------
+                # 1. Original (Pre-Deblur)
+                wagon_orig = wagon_crop.copy()
+                
+                # 2. Deblur (Conditional)
+                wagon_deblur = wagon_crop.copy() # Default to orig if no deblur happens
+                
                 if deblur_engine:
                     blur_score = calculate_blur_score(wagon_crop)
-
-                    # Use realistic thresholds for text motion blur
                     if blur_score < 1:
-                        # -----------------------------
-                        # SAVE ORIGINAL (BLURRED) WAGON
-                        # -----------------------------
+                        print(f"[INFO] Deblurring wagon {wagon_id} | Blur score: {blur_score:.1f}")
+                        wagon_deblur = deblur_engine.deblur(wagon_crop)
+                        # Update wagon_crop for OCR model usage
+                        wagon_crop = wagon_deblur 
+                
+                # 3. Store in Cache (Overwrite/Update with latest view of this wagon)
+                if 'wagon_image_cache' not in locals():
+                    wagon_image_cache = {}
+                
+                wagon_image_cache[wagon_id] = {
+                    'orig': wagon_orig,
+                    'deblur': wagon_deblur,
+                    'ts': ts
+                }
 
-                        wagon_blur = wagon_crop.copy()
-                        # Use unified 'ts'
-                        orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
-                        cv2.imwrite(orig_path, wagon_blur)
 
-                        print(f"[INFO] Deblurring wagon {wagon_id} | Blur score: {blur_score:.1f} | Size: {wagon_crop.shape[:2]}")
-                        wagon_crop = deblur_engine.deblur(wagon_crop)
-
-                        # Save Deburred using same 'ts'
-                        wagon_save_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
-                        cv2.imwrite(wagon_save_path, wagon_crop)
-                        deblur_path = wagon_save_path
-                    
                 # -----------------------------
                 # NOW run Model B on CLEAN wagon
                 # -----------------------------
@@ -252,7 +254,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     results_b = model_b.predict(wagon_crop, verbose=False, conf=0.25)
                     
                     # DEBUG: Log results
-                    print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
+                    if len(results_b[0].boxes) > 0:
+                        print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
 
                     # If Number Found (Class 0 in Model B)
                     for r in results_b:
@@ -260,8 +263,24 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                             nx1, ny1, nx2, ny2 = map(int, nbox)
                             
                             # Only trigger OCR once per wagon for now
-                            if wagon_id not in ocr_requested:
-                                # 1. Add Padding (50%) - Sufficient context without too much noise
+                            if wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
+                                # -----------------------------
+                                # PERSISTENCE: Save Images NOW
+                                # -----------------------------
+                                cache = wagon_image_cache[wagon_id] # Retrieve latest cached view
+                                current_ts = cache['ts']
+                                
+                                # Save Original
+                                orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                cv2.imwrite(orig_path, cache['orig'])
+                                
+                                # Save Deblurred
+                                deblur_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                cv2.imwrite(deblur_path, cache['deblur'])
+
+
+                                # Prepare OCR Crop
+                                # 1. Add Padding (50%)
                                 pad_w = int((nx2 - nx1) * 1.2)
                                 pad_h = int((ny2 - ny1) * 1.0)
                                 px1 = max(0, nx1 - pad_w)
@@ -271,9 +290,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 
                                 number_img = wagon_crop[py1:py2, px1:px2]
                                 
-                                # 2. Dynamic Scaling (Target Height ~96px)
-                                # PaddleOCR works best with text height 32-96px.
-                                # Avoid making it massive (300px+) or tiny (<20px).
+                                # 2. Dynamic Scaling
                                 if number_img.size > 0:
                                     h_img, w_img = number_img.shape[:2]
                                     target_height = 96.0
@@ -282,53 +299,27 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                         scale_factor = target_height / h_img
                                         number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
                                     
-                                    # Initialize Paths (Important for DB)
-                                    orig_path = ""
-                                    deblur_path = ""
-                                    
-                                    # DEBLUR CHECK
-                                    # final_img = number_img
-                                    # if deblur_engine:
-                                    #     score = calculate_blur_score(number_img)
-                                        # Threshold logic: Lower score = more blur. 
-                                        # Typical Laplacian var for sharp text is > 100-200.
-                                        # We trigger deblur if score < 150 (Tunable)
-                                        # Bumping to 500 to ensure it triggers for demo
-                                        # if score < 500:
-                                        #     print(f"[INFO] Deblurring Wagon {wagon_id} (Score: {score:.1f}, Size: {number_img.shape[:2]})")
-                                        #     h_img, w_img = number_img.shape[:2]
-                                        #     if h_img < 64 or w_img < 128:
-                                        #         # Too small for deblurring – skip
-                                        #         final_img = number_img
-                                        #     else:
-                                        #         final_img = deblur_engine.deblur(number_img)
-
                                     final_img = number_img
 
-                                    # User's Modified Deblur/Process Block
-                                    # (Preserving their commented out style or logical intent, but fixing scope)
-                                    # It seems they want detailEnhance.
+                                    # User's Modified Deblur/Process Block (Detail Enhance)
+                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
                                     final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
 
-                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
-
-                                    # Save Result
-                                    # Use unified 'ts'
-                                    save_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{ts}.jpg")
-                                    cv2.imwrite(save_path, final_img)
+                                    # Save OCR Crop
+                                    ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                    cv2.imwrite(ocr_path, final_img)
                                     
-                                    # Fallback logic for DB paths
-                                    # If deblur didn't happen, use the OCR crop path as placeholder 
-                                    # so the DB has *something* to show.
-                                    if not deblur_path:
-                                        deblur_path = save_path
-                                    if not orig_path:
-                                         orig_path = save_path 
+                                    # Fallback paths for DB (Logic preserved)
+                                    if not deblur_path: deblur_path = ocr_path
+                                    if not orig_path: orig_path = ocr_path 
                                     
-                                    # Pass 'save_path' as 'ocr_path'
+                                    # Queue for OCR
                                     print(f"[DEBUG] Queueing OCR for Wagon {wagon_id}")
-                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, save_path))
+                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path))
                                     ocr_requested.add(wagon_id)
+                                    
+                                    # Cleanup Cache (Optional, keeps memory low)
+                                    # del wagon_data[wagon_id]
                                     
                             # Visualization
                             gx1, gy1 = x1 + nx1, y1 + ny1

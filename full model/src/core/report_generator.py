@@ -64,4 +64,79 @@ def generate_report(inspection, wagons):
         pdf.cell(40, 10, ts, 1)
         pdf.ln()
 
+    
+    # -----------------------------
+    # Visual Inspection Section
+    # -----------------------------
+    pdf.add_page()
+    pdf.set_font('Arial', 'B', 14)
+    pdf.cell(0, 10, "Detailed Visual Inspection", 0, 1, 'L')
+    pdf.ln(5)
+    
+    import os
+    
+    for wagon in wagons:
+        # Header for the Wagon
+        pdf.set_font('Arial', 'B', 12)
+        bg_color = (240, 240, 240)
+        pdf.set_fill_color(*bg_color)
+        title = f"Wagon #{wagon['wagon_index']} - OCR: {wagon['ocr_text'] or 'N/A'}"
+        pdf.cell(0, 8, title, 0, 1, 'L', fill=True)
+        pdf.ln(2)
+        
+        # Images Row
+        # Calculate positions
+        # Page width ~210mm. Margins ~10mm each. Usable ~190mm.
+        # 3 Images -> ~60mm each with spacing.
+        
+        y_start = pdf.get_y()
+        
+        # Check if we have enough space for images (approx 50mm height needed), else new page
+        if y_start > 230:
+            pdf.add_page()
+            y_start = pdf.get_y()
+            pdf.cell(0, 8, title + " (Cont.)", 0, 1, 'L', fill=True)
+            pdf.ln(2)
+            y_start = pdf.get_y()
+            
+        img_width = 55
+        img_height = 40 # Fixed height to keep alignment, or auto
+        x_start = 10
+        gap = 5
+        
+        # Define images to show
+        images = [
+            ("Original", wagon.get('original_image_path')),
+            ("Deblurred", wagon.get('deblurred_image_path')),
+            ("OCR Crop", wagon.get('cropped_number_path'))
+        ]
+        
+        current_x = x_start
+        max_h = 0
+        
+        for label, path in images:
+            # Draw Label
+            pdf.set_xy(current_x, y_start)
+            pdf.set_font('Arial', 'I', 8)
+            pdf.cell(img_width, 5, label, 0, 0, 'C')
+            
+            # Draw Image
+            if path and os.path.exists(path):
+                try:
+                    pdf.image(path, x=current_x, y=y_start+6, w=img_width, h=img_height)
+                except Exception as e:
+                    pdf.set_xy(current_x, y_start + 20)
+                    pdf.set_font('Arial', '', 8)
+                    pdf.cell(img_width, 5, "[Image Error]", 0, 0, 'C')
+            else:
+                # Placeholder Box
+                pdf.rect(current_x, y_start+6, img_width, img_height)
+                pdf.set_xy(current_x, y_start+20)
+                pdf.cell(img_width, 5, "No Image", 0, 0, 'C')
+            
+            current_x += (img_width + gap)
+        
+        pdf.set_y(y_start + img_height + 10)
+        pdf.ln(2)
+
     return pdf

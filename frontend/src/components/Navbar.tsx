@@ -13,8 +13,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
             <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
                 {/* Brand */}
                 <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-linear-to-tr from-blue-600 to-purple-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                        <span className="font-bold text-white text-lg">M</span>
+                    <div className="w-25 h-25 flex items-center justify-center">
+                        <img src="PhotoshopExtension_Image (1).png" alt="" />
                     </div>
                     <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-white to-gray-400">
                         Garud
@@ -28,8 +28,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
                             key={tab}
                             onClick={() => onTabChange(tab)}
                             className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === tab
-                                    ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
+                                : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             {tab}

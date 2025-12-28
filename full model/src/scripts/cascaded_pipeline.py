@@ -554,6 +554,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     print("-" * 50)
     
     # Mark as Completed
+    database.update_inspection_count(inspection_id, total_wagons)
     database.update_inspection_status(inspection_id, "COMPLETED")
 
 if __name__ == "__main__":

@@ -47,7 +47,10 @@ def ocr_worker(input_queue, output_queue):
 # Cascaded Pipeline
 # -----------------------------
 def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None):
-    if not os.path.exists(video_path): return
+    if not os.path.exists(video_path):
+        print(f"[ERROR] Video file not found at: {video_path}")
+        print(f"[INFO] Current working directory: {os.getcwd()}")
+        return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
     model_a = YOLO(model_a_path)
@@ -355,8 +358,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 # Formatted Output
                 parsed_str = str(parsed) if parsed else "Invalid"
                 
-                log_entry = f"[{det_time}] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str} | Latency: {latency:.2f}s"
-                print(log_entry)
+                # log_entry = f"[{det_time}] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str} | Latency: {latency:.2f}s"
+                # print(log_entry)
                 
                 consist_log.append({
                     'id': wagon_id,

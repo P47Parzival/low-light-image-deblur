@@ -8,6 +8,7 @@ import time
 import queue
 from collections import deque
 import numpy as np
+import json
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -37,6 +38,11 @@ def ocr_worker(input_queue, output_queue):
         
         if raw_text:
             parsed = IndianWagonParser.parse(raw_text)
+
+            # checksum validation can be enabled if needed
+            # if parsed and not IndianWagonParser.validate_checksum(raw_text):
+            #     print(f"[WARNING] Invalid checksum for wagon {raw_text}")
+            #     parsed = None
             output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path))
         else:
             print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
@@ -115,6 +121,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     wagon_image_cache = {}
     ocr_requested = set()
 
+    # System Health Logs
+    brightness_log = []
+    blur_scores_log = []
+
     # -----------------------------
     # VIDEO DISPLAY SETTINGS (VLC-like)
     # -----------------------------
@@ -149,6 +159,11 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         
         frame_cnt += 1
         t0 = time.time()
+
+        # Telemetry: Brightness (Sample every 5 frames for speed)
+        if frame_cnt % 5 == 0:
+             # fast mean
+             brightness_log.append(np.mean(frame))
         
         # -----------------------------
         # STEP 1: Model A (Full Frame) - Detect Wagons
@@ -220,6 +235,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
                     if deblur_engine:
                         blur_score = calculate_blur_score(wagon_crop)
+                        blur_scores_log.append(blur_score) # Log score
 
                         # Realistic threshold for motion blur
                         if blur_score < 80:
@@ -229,6 +245,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 f"Orig size: {wagon_crop.shape[:2]}"
                             )
                             wagon_deblur = deblur_engine.deblur(wagon_crop)
+                    else:
+                        # Even if no deblur engine, log blur score for report
+                         blur_scores_log.append(calculate_blur_score(wagon_crop))
 
                     # Store ONCE per wagon_id
                     wagon_image_cache[wagon_id] = {
@@ -549,8 +568,26 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     print("-" * 50)
     
     # Mark as Completed
+    # Calculate Metrics
+    final_fps = frame_cnt / (time.time() - start_time.timestamp())
+    avg_brightness = np.mean(brightness_log) if brightness_log else 0.0
+    resolution_str = f"{video_width}x{video_height}"
+    
+    # Blur Histogram (Bins: <50, 50-100, 100-200, >200)
+    blur_hist = {'<50': 0, '50-100': 0, '100-200': 0, '>200': 0}
+    if blur_scores_log:
+        for s in blur_scores_log:
+            if s < 50: blur_hist['<50'] += 1
+            elif s < 100: blur_hist['50-100'] += 1
+            elif s < 200: blur_hist['100-200'] += 1
+            else: blur_hist['>200'] += 1
+            
+    blur_stats_json = json.dumps(blur_hist)
+
+    # Mark as Completed & Save Metrics
     database.update_inspection_count(inspection_id, total_wagons)
     database.update_inspection_status(inspection_id, "COMPLETED")
+    database.update_inspection_metrics(inspection_id, final_fps, resolution_str, avg_brightness, blur_stats_json)
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)

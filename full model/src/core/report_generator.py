@@ -1,5 +1,6 @@
 from fpdf import FPDF
 import datetime
+import json
 
 class PDFReport(FPDF):
     def header(self):
@@ -27,18 +28,66 @@ def generate_report(inspection, wagons):
     pdf.cell(0, 8, f"Total Wagons: {inspection['total_wagons']}", 0, 1)
     pdf.ln(10)
 
-    # Summary Stats
+    # Summary Stats & System Health (Side-by-Side)
     ocr_success = len([w for w in wagons if w['ocr_text'] and w['ocr_text'] != "OCR Failed"])
     defects = len([w for w in wagons if w['defects'] != "None"])
     night = len([w for w in wagons if w['is_night']])
     
+    # Save current Y
+    y_start = pdf.get_y()
+    
+    # LEFT COLUMN: Business Stats
+    pdf.set_xy(10, y_start)
     pdf.set_font('Arial', 'B', 12)
-    pdf.cell(0, 10, "Summary Statistics", 0, 1)
+    pdf.cell(90, 10, "Summary Statistics", 0, 1)
     pdf.set_font('Arial', '', 12)
-    pdf.cell(0, 8, f"Successful OCR: {ocr_success}", 0, 1)
-    pdf.cell(0, 8, f"Wagons with Defects: {defects}", 0, 1)
-    pdf.cell(0, 8, f"Night Conditions: {night}", 0, 1)
-    pdf.ln(10)
+    pdf.cell(90, 8, f"Successful OCR: {ocr_success}", 0, 1)
+    pdf.cell(90, 8, f"Wagons with Defects: {defects}", 0, 1)
+    pdf.cell(90, 8, f"Night Conditions: {night}", 0, 1)
+    
+    # RIGHT COLUMN: System Health (Hardware)
+    # Parse metrics
+    fps = inspection.get('fps', 0.0)
+    res = inspection.get('resolution', 'N/A')
+    bright = inspection.get('avg_brightness', 0.0)
+    blur_stats = inspection.get('blur_stats', '{}')
+    try:
+        blur_hist = json.loads(blur_stats)
+    except:
+        blur_hist = {}
+
+    pdf.set_xy(110, y_start)
+    pdf.set_font('Arial', 'B', 12)
+    pdf.cell(90, 10, "System Health (Hardware)", 0, 1)
+    
+    pdf.set_xy(110, pdf.get_y())
+    pdf.set_font('Arial', '', 10)
+    pdf.cell(90, 6, f"Camera FPS: {fps:.1f}", 0, 1)
+    
+    pdf.set_xy(110, pdf.get_y())
+    pdf.cell(90, 6, f"Resolution: {res}", 0, 1)
+    
+    pdf.set_xy(110, pdf.get_y())
+    pdf.cell(90, 6, f"Avg Brightness: {bright:.1f} (0-255)", 0, 1)
+    
+    pdf.set_xy(110, pdf.get_y())
+    pdf.cell(90, 6, "Blur Severity Histogram:", 0, 1)
+    
+    # Mini histogram text
+    current_y = pdf.get_y()
+    pdf.set_xy(115, current_y)
+    pdf.set_font('Courier', '', 9)
+    # Sort keys for consistent order if standard bins
+    bins = ['<50', '50-100', '100-200', '>200']
+    for b in bins:
+        count = blur_hist.get(b, 0)
+        if count > 0:
+            pdf.cell(80, 4, f"{b:<8}: {count}", 0, 1)
+            pdf.set_x(115)
+            
+    # Reset cursor below both columns
+    pdf.set_xy(10, y_start + 50)
+    pdf.ln(5)
 
     # Table Header
     pdf.set_font('Arial', 'B', 10)

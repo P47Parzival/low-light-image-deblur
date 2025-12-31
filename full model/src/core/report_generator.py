@@ -50,7 +50,9 @@ def generate_report(inspection, wagons):
     pdf.set_font('Arial', '', 12)
 
     # Inspection Details
-    train_speed = inspection.get('train_speed', 0.0)
+    # Inspection Details
+    train_speed = inspection.get('train_speed')
+    if train_speed is None: train_speed = 0.0
     speed_text = f"{train_speed:.1f} km/h" if train_speed > 0 else "N/A"
 
     pdf.set_fill_color(245, 245, 245)
@@ -94,10 +96,18 @@ def generate_report(inspection, wagons):
     
     # RIGHT COLUMN: System Health (Hardware)
     # Parse metrics
-    fps = inspection.get('fps', 0.0)
-    res = inspection.get('resolution', 'N/A')
-    bright = inspection.get('avg_brightness', 0.0)
-    blur_stats = inspection.get('blur_stats', '{}')
+    # Parse metrics
+    fps = inspection.get('fps')
+    if fps is None: fps = 0.0
+    
+    res = inspection.get('resolution')
+    if res is None: res = 'N/A'
+    
+    bright = inspection.get('avg_brightness')
+    if bright is None: bright = 0.0
+    
+    blur_stats = inspection.get('blur_stats')
+    if blur_stats is None: blur_stats = '{}'
     try:
         blur_hist = json.loads(blur_stats)
     except:

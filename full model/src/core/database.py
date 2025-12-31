@@ -48,6 +48,12 @@ def init_db():
     except sqlite3.OperationalError:
         pass
     
+    try:
+        cursor.execute("ALTER TABLE inspections ADD COLUMN start_time TEXT")
+        cursor.execute("ALTER TABLE inspections ADD COLUMN end_time TEXT")
+    except sqlite3.OperationalError:
+        pass
+    
     # Table: Wagons (Represents a detected wagon in an inspection)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS wagons (
@@ -68,6 +74,19 @@ def init_db():
     
     conn.commit()
     return conn
+
+def update_inspection_times(inspection_id, start_time=None, end_time=None):
+    """Update start and end times for an inspection."""
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    if start_time:
+        cursor.execute('UPDATE inspections SET start_time = ? WHERE id = ?', (start_time, inspection_id))
+    if end_time:
+        cursor.execute('UPDATE inspections SET end_time = ? WHERE id = ?', (end_time, inspection_id))
+        
+    conn.commit()
+    conn.close()
 
 def update_inspection_video_path(inspection_id, video_path):
     """Update the enhanced video path for an inspection."""

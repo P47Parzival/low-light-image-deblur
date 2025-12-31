@@ -10,6 +10,7 @@ import random
 import time
 import os
 import sys
+from datetime import datetime
 
 # Import Database Module
 sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
@@ -235,6 +236,106 @@ def generate_frames(url_key):
 @app.get("/video_feed/{stream_id}")
 async def video_feed(stream_id: int):
     return StreamingResponse(generate_frames(stream_id), media_type="multipart/x-mixed-replace; boundary=frame")
+
+
+# -----------------------------
+# LIVE PROCESSING CONTROL
+# -----------------------------
+live_process = None
+live_inspection_id = None
+
+import multiprocessing
+
+def run_live_pipeline(stream_url, inspection_id):
+    """Wrapper to run the pipeline in a separate process."""
+    # Define Model Paths (Same as upload)
+    base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
+    model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
+    model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
+    deblur_model = os.path.join(base_dir, "NAFnet/NAFNet-GoPro-width64.pth")
+    
+    # Run Pipeline
+    # Note: cascaded_pipeline handles DB connections internally
+    cascaded_pipeline(
+        video_path=stream_url,
+        model_a_path=model_a,
+        model_b_path=model_b,
+        deblur_model_path=deblur_model,
+        headless=True,
+        inspection_id=inspection_id
+    )
+
+@app.post("/live/start")
+async def start_live_processing(stream_id: int = 1):
+    """Start the AI pipeline on the live stream."""
+    global live_process, live_inspection_id
+    
+    if live_process and live_process.is_alive():
+        return {"status": "error", "message": "Live processing is already running."}
+    
+    # Get Stream URL
+    urls = {
+        1: "https://www.youtube.com/watch?v=7xdHH9KMSVk",
+        2: "https://www.youtube.com/watch?v=nO81bQFql7M",
+        3: "https://www.youtube.com/watch?v=23tmCNeFh7A"
+    }
+    youtube_url = urls.get(stream_id, urls[1])
+    try:
+        stream_url = get_youtube_stream_url(youtube_url)
+    except Exception as e:
+        return {"status": "error", "message": f"Failed to get stream URL: {e}"}
+        
+    # Create Inspection Record
+    video_name = f"Live Stream {stream_id} - {datetime.now().strftime('%H:%M')}"
+    live_inspection_id = database.create_inspection(video_name)
+    database.update_inspection_times(live_inspection_id, start_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+    
+    # Start Process
+    live_process = multiprocessing.Process(
+        target=run_live_pipeline, 
+        args=(stream_url, live_inspection_id)
+    )
+    live_process.start()
+    
+    print(f"[API] Live processing started. PID: {live_process.pid} | Inspection ID: {live_inspection_id}")
+    
+    return {
+        "status": "started", 
+        "inspection_id": live_inspection_id, 
+        "message": "AI Pipeline attached to live feed."
+    }
+
+@app.post("/live/stop")
+async def stop_live_processing():
+    """Stop the AI pipeline."""
+    global live_process, live_inspection_id
+    
+    if live_process and live_process.is_alive():
+        print(f"[API] Stopping live processing process {live_process.pid}...")
+        live_process.terminate()
+        live_process.join()  # Wait for it to finish
+        live_process = None
+        
+        # Update DB
+        if live_inspection_id:
+            database.update_inspection_times(live_inspection_id, end_time=datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+            database.update_inspection_status(live_inspection_id, "COMPLETED") 
+            # Note: Might leave metrics empty if pipeline didn't finish gracefully, 
+            # but that's acceptable for forced stop.
+        
+        return {"status": "stopped", "message": "Live processing stopped."}
+    
+    return {"status": "idle", "message": "No active processing to stop."}
+
+@app.get("/live/status")
+async def get_live_status():
+    """Check if live processing is active."""
+    global live_process, live_inspection_id
+    is_running = live_process is not None and live_process.is_alive()
+    return {
+        "is_running": is_running,
+        "inspection_id": live_inspection_id if is_running else None
+    }
 
 @app.get("/stats")
 async def get_stats():

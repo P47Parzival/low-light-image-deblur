@@ -112,6 +112,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     # Data Buffers
     unique_wagons = set()
     consist_log = [] # List of dicts: {'id': track_id, 'text': ..., 'parsed': ..., 'time': ...}
+    wagon_timestamps = {} # Map id -> first_detection_time
     
     # Restoring Initialization
     frame_cnt = 0
@@ -192,7 +193,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
                     if 0.03 < ratio < 0.40:
                         active_wagons_list.append((track_id, box))
-                        unique_wagons.add(track_id)
+                        if track_id not in unique_wagons:
+                            unique_wagons.add(track_id)
+                            # Log timestamp for speed calculation
+                            wagon_timestamps[track_id] = t0
                     else:
                         pass
                         # print(f"[DEBUG] Filtered box {track_id} with area ratio {ratio:.3f}")
@@ -584,10 +588,30 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
             
     blur_stats_json = json.dumps(blur_hist)
 
+    # Train Speed Calculation (Robust Inter-Wagon Timing)
+    # Speed = Wagon Length (14.7m) / Avg Time Gap
+    calculated_speed = 0.0
+    
+    if len(wagon_timestamps) > 2:
+        # Sort by timestamp
+        times = sorted(wagon_timestamps.values())
+        deltas = []
+        for i in range(1, len(times)):
+            d = times[i] - times[i-1]
+            if 0.5 < d < 5.0: # Filter outliers (e.g. stops or missed detections)
+                deltas.append(d)
+        
+        if len(deltas) > 0:
+            avg_delta = sum(deltas) / len(deltas)
+            if avg_delta > 0:
+                speed_mps = 14.7 / avg_delta
+                calculated_speed = speed_mps * 3.6 # Convert to km/h
+                print(f"[INFO] Estimated Train Speed: {calculated_speed:.1f} km/h (Avg Gap: {avg_delta:.2f}s)")
+
     # Mark as Completed & Save Metrics
     database.update_inspection_count(inspection_id, total_wagons)
     database.update_inspection_status(inspection_id, "COMPLETED")
-    database.update_inspection_metrics(inspection_id, final_fps, resolution_str, avg_brightness, blur_stats_json)
+    database.update_inspection_metrics(inspection_id, final_fps, resolution_str, avg_brightness, blur_stats_json, calculated_speed)
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)

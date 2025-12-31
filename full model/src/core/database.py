@@ -42,6 +42,11 @@ def init_db():
         cursor.execute("ALTER TABLE inspections ADD COLUMN blur_stats TEXT") # JSON string
     except sqlite3.OperationalError:
         pass
+        
+    try:
+        cursor.execute("ALTER TABLE inspections ADD COLUMN train_speed REAL")
+    except sqlite3.OperationalError:
+        pass
     
     # Table: Wagons (Represents a detected wagon in an inspection)
     cursor.execute('''
@@ -80,15 +85,15 @@ def update_inspection_status(inspection_id, status):
     conn.commit()
     conn.close()
 
-def update_inspection_metrics(inspection_id, fps, resolution, brightness, blur_stats):
+def update_inspection_metrics(inspection_id, fps, resolution, brightness, blur_stats, train_speed=0.0):
     """Update the system health metrics for an inspection."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     cursor.execute('''
         UPDATE inspections 
-        SET fps = ?, resolution = ?, avg_brightness = ?, blur_stats = ? 
+        SET fps = ?, resolution = ?, avg_brightness = ?, blur_stats = ?, train_speed = ? 
         WHERE id = ?
-    ''', (fps, resolution, brightness, blur_stats, inspection_id))
+    ''', (fps, resolution, brightness, blur_stats, train_speed, inspection_id))
     conn.commit()
     conn.close()
 

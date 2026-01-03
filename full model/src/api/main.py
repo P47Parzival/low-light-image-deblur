@@ -16,7 +16,7 @@ from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
 import database
 import report_generator
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Request
 from fastapi.responses import Response
 
 # Import Pipeline
@@ -138,9 +138,9 @@ async def generate_report_pdf(inspection_id: int):
     pdf = report_generator.generate_report(inspection, wagons)
     
     # Output to bytes
-    # output(dest='S') returns the document as a string (latin-1 encoding).
-    # We need to encode it to bytes.
-    pdf_bytes = pdf.output(dest='S').encode('latin-1')
+    # The .output() method returns the document as bytes, which is ready for the response.
+    pdf_byte_array = pdf.output()
+    pdf_bytes = bytes(pdf_byte_array) # Ensure it's the immutable `bytes` type for the Response
     
     headers = {
         'Content-Disposition': f'attachment; filename="report_{inspection_id}.pdf"'
@@ -192,50 +192,52 @@ def get_youtube_stream_url(youtube_url: str) -> str:
         return info["url"]
 
 
-def generate_frames(url_key):
+async def generate_frames(url_key: int, request: Request):
+    """Generator function to stream video frames from a YouTube URL."""
     urls = {
         1: "https://www.youtube.com/watch?v=7xdHH9KMSVk",
         2: "https://www.youtube.com/watch?v=nO81bQFql7M",
         3: "https://www.youtube.com/watch?v=23tmCNeFh7A"
     }
-    
     youtube_url = urls.get(url_key, urls[1])
+    cap = None
     try:
         stream_url = get_youtube_stream_url(youtube_url)
-    except Exception as e:
-        print(f"Error getting YouTube URL for stream {url_key}: {e}")
-        return
-
-    cap = cv2.VideoCapture(stream_url)
-    
-    # Simulate processing loop
-    while True:
-        success, frame = cap.read()
-        # print("Frame read:", success)
-        if not success:
-            # If video ends, try to reconnect
-            print(f"Stream {url_key} ended, restarting...")
-            cap.release()
-            try:
-                stream_url = get_youtube_stream_url(youtube_url)
-                cap = cv2.VideoCapture(stream_url)
-                continue
-            except:
+        cap = cv2.VideoCapture(stream_url)
+        loop = asyncio.get_running_loop()
+        
+        while True:
+            # Check if the client has disconnected
+            if await request.is_disconnected():
+                print(f"Client disconnected for stream {url_key}. Stopping.")
                 break
 
-        # Encode header
-        ret, buffer = cv2.imencode('.jpg', frame)
-        frame_bytes = buffer.tobytes()
-        
-        yield (b'--frame\r\n'
-               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
-        
-        # Limit FPS
-        time.sleep(0.04) 
+            # Run blocking I/O (cap.read) in a separate thread to avoid blocking the event loop
+            success, frame = await loop.run_in_executor(None, cap.read)
+
+            if not success:
+                print(f"Stream {url_key} ended or failed. Breaking loop.")
+                break
+
+            # Also run the potentially blocking encoding in an executor
+            ret, buffer = await loop.run_in_executor(None, cv2.imencode, '.jpg', frame)
+            frame_bytes = buffer.tobytes()
+            
+            yield (b'--frame\r\n'
+                   b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+            
+            await asyncio.sleep(0.04)  # Use asyncio.sleep for non-blocking delay
+    except Exception as e:
+        # This will catch errors like client disconnection during the yield
+        print(f"An error occurred in generate_frames for stream {url_key} (client likely disconnected): {e}")
+    finally:
+        if cap:
+            print(f"Releasing video capture for stream {url_key}.")
+            cap.release()
 
 @app.get("/video_feed/{stream_id}")
-async def video_feed(stream_id: int):
-    return StreamingResponse(generate_frames(stream_id), media_type="multipart/x-mixed-replace; boundary=frame")
+async def video_feed(stream_id: int, request: Request):
+    return StreamingResponse(generate_frames(stream_id, request), media_type="multipart/x-mixed-replace; boundary=frame")
 
 
 # -----------------------------

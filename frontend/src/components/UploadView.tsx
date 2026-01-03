@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Upload } from 'lucide-react';
 
 const UploadView: React.FC = () => {
     const [file, setFile] = useState<File | null>(null);
@@ -84,82 +85,75 @@ const UploadView: React.FC = () => {
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
-            {/* Top Section: Upload & Preview */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-[400px]">
+            <div className="flex items-center gap-4 mb-8">
+                <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-transparent"></div>
+                <span className="text-xs tracking-[0.3em] text-blue-400 font-bold uppercase">Upload Module</span>
+            </div>
 
-                {/* Upload Panel */}
-                <div className={`bg-gray-900/50 backdrop-blur rounded-2xl p-6 flex flex-col items-center justify-center border-dashed border-2  transition-colors group relative ${uploading ? 'opacity-50 border-gray-800' : 'border-gray-700 hover:border-gray-500'}`}>
-                    <input
+            {/* If no file is selected, show the big upload button */}
+            {!file && (
+                <div className="border-2 border-dashed border-zinc-800 rounded-2xl p-16 text-center hover:border-zinc-700 transition-all bg-zinc-950/50 relative">
+                     <input
                         type="file"
                         accept="video/*"
-                        className="hidden"
+                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                         id="video-upload"
                         onChange={handleFileChange}
                         disabled={uploading}
                     />
-                    <label htmlFor="video-upload" className={`cursor-pointer text-center space-y-4 w-full h-full flex flex-col items-center justify-center relative z-10 ${uploading ? 'cursor-not-allowed' : ''}`}>
-                        <div className="w-16 h-16 rounded-full bg-gray-800 group-hover:bg-gray-700 flex items-center justify-center transition-colors">
-                            <span className="text-2xl">📤</span>
-                        </div>
-                        <div className="space-y-1">
-                            <h3 className="text-xl font-bold text-white">
-                                {file ? "Change Video" : "Upload Inspection Video"}
-                            </h3>
-                            <p className="text-gray-400 text-sm">
-                                {file ? file.name : "Drag drop or click to browse"}
-                            </p>
-                        </div>
+                    <label htmlFor="video-upload" className="cursor-pointer">
+                        <Upload className="w-16 h-16 text-zinc-600 mx-auto mb-6" />
+                        <h3 className="text-xl font-bold text-white mb-2">Upload Video Files</h3>
+                        <p className="text-zinc-500 mb-6">Drag and drop your inspection videos here</p>
+                        <span className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white font-semibold rounded-lg">
+                            Select Files
+                        </span>
                     </label>
                 </div>
+            )}
 
-                {/* Preview Panel (Loading State) */}
-                <div className="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-2xl p-6 relative overflow-hidden flex flex-col items-center justify-center">
-                    {previewUrl ? (
-                        <div className="w-full h-full flex flex-col gap-4">
-                            <h3 className="text-sm font-bold text-gray-400 uppercase">Preview</h3>
+            {/* If a file is selected, show preview and controls */}
+            {previewUrl && (
+                 <div className="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden flex flex-col gap-4">
+                    <h3 className="text-sm font-bold text-zinc-400 uppercase">Preview &amp; Process</h3>
 
-                            {/* Video Wrapper with Overlay */}
-                            <div className="flex-1 bg-black rounded-lg overflow-hidden border border-gray-700 relative">
-                                <video src={previewUrl} controls className="w-full h-full object-contain" />
+                    {/* Video Wrapper with Overlay */}
+                    <div className="flex-1 bg-black rounded-lg overflow-hidden border border-zinc-700 relative aspect-video">
+                        <video src={previewUrl} controls className="w-full h-full object-contain" />
 
-                                {processing && (
-                                    <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm animate-in fade-in">
-                                        <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                        <span className="text-blue-400 font-mono animate-pulse">AI PROCESSING PIPELINE RUNNING</span>
-                                        <span className="text-xs text-gray-500 mt-2">Checking Wagons, OCR, Defects...</span>
-                                    </div>
-                                )}
+                        {processing && (
+                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm animate-in fade-in">
+                                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+                                <span className="text-blue-400 font-mono animate-pulse">AI PROCESSING PIPELINE RUNNING</span>
+                                <span className="text-xs text-zinc-500 mt-2">Checking Wagons, OCR, Defects...</span>
                             </div>
+                        )}
+                    </div>
 
-                            <div className="flex justify-between items-center bg-gray-800/50 p-3 rounded-lg border border-white/5">
-                                {status && (
-                                    <span className={`text-sm font-bold ${status.includes("Complete") ? "text-green-400" : "text-yellow-400"}`}>
-                                        {status}
-                                    </span>
-                                )}
-                                {!processing && (
-                                    <button
-                                        onClick={handleUpload}
-                                        disabled={uploading}
-                                        className={`bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-lg font-bold transition-all ml-auto ${uploading ? 'hidden' : ''}`}
-                                    >
-                                        Start Processing 🚀
-                                    </button>
-                                )}
-                            </div>
+                    <div className="flex justify-between items-center bg-zinc-900/50 p-3 rounded-lg border border-zinc-800">
+                        <div className='flex flex-col'>
+                            <span className={`text-sm font-bold ${status && status.includes("Complete") ? "text-emerald-400" : "text-amber-400"}`}>
+                                {status || file?.name}
+                            </span>
+                            {status && <span className='text-xs text-zinc-500'>{file?.name}</span>}
                         </div>
-                    ) : (
-                        <div className="text-gray-600 italic">
-                            Video preview will appear here
-                        </div>
-                    )}
+                        {!processing && (
+                            <button
+                                onClick={handleUpload}
+                                disabled={uploading}
+                                className={`bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white px-6 py-2 rounded-lg font-semibold transition-all ml-auto ${uploading ? 'hidden' : ''}`}
+                            >
+                                Start Processing
+                            </button>
+                        )}
+                    </div>
                 </div>
-            </div>
+            )}
 
             {/* Guidelines / Info */}
-            <div className="bg-gray-900/50 backdrop-blur border border-gray-800 rounded-2xl p-6">
+            <div className="bg-zinc-950/50 border border-zinc-800 rounded-2xl p-6">
                 <h3 className="text-lg font-bold text-white mb-4">How it works</h3>
-                <ul className="list-disc list-inside text-gray-400 space-y-2">
+                <ul className="list-disc list-inside text-zinc-400 space-y-2">
                     <li>Upload an MP4/AVI file of the freight train inspection.</li>
                     <li>The system will automatically queue it for processing.</li>
                     <li>The pipeline includes: Night Detection, Zero-DCE Enhancement, Wagon Detection, OCR, and Deblurring.</li>
@@ -171,4 +165,3 @@ const UploadView: React.FC = () => {
 };
 
 export default UploadView;
-

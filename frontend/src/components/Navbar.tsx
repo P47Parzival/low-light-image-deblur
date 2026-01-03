@@ -1,4 +1,5 @@
 import React from 'react';
+import { Activity, Upload, History, FileText, Zap, Download } from 'lucide-react';
 
 interface NavbarProps {
     activeTab: string;
@@ -6,44 +7,50 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
-    const tabs = ["Live", "Upload", "History"];
+    const tabs = [
+        { id: 'Live', icon: Activity, label: 'Live Inspection' },
+        { id: 'Upload', icon: Upload, label: 'Upload' },
+        { id: 'History', icon: History, label: 'History' },
+        { id: 'Reports', icon: FileText, label: 'Reports' }
+    ];
 
     return (
-        <nav className="fixed top-0 w-full z-50 bg-black/50 backdrop-blur-xl border-b border-white/5">
-            <div className="max-w-7xl mx-auto px-6 h-16 flex items-center justify-between">
+        <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-black/40 backdrop-blur-2xl">
+            <div className="max-w-[1400px] mx-auto px-8 h-20 flex items-center justify-between">
                 {/* Brand */}
                 <div className="flex items-center gap-3">
-                    <div className="w-25 h-25 flex items-center justify-center">
-                        <img src="PhotoshopExtension_Image (1).png" alt="" />
-                    </div>
-                    <span className="text-xl font-bold tracking-tight bg-clip-text text-transparent bg-linear-to-r from-white to-gray-400">
+                    {/* Assuming the logo from the homepage is in the public folder */}
+                    <img src="/PhotoshopExtension_Image (1).png" alt="Garud Logo" className="h-9 w-auto" />
+                    <span className="text-2xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
                         Garud
                     </span>
+                    <span className="text-zinc-600 font-light">/ Dashboard</span>
                 </div>
 
                 {/* Navigation Tabs */}
-                <div className="flex items-center gap-1 bg-white/5 p-1 rounded-lg border border-white/5">
+                <div className="flex items-center gap-10">
                     {tabs.map((tab) => (
                         <button
-                            key={tab}
-                            onClick={() => onTabChange(tab)}
-                            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all duration-200 ${activeTab === tab
-                                ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20'
-                                : 'text-gray-400 hover:text-white hover:bg-white/5'
-                                }`}
+                            key={tab.id}
+                            onClick={() => onTabChange(tab.id)}
+                            className="relative group px-1 py-2 text-sm font-medium transition-colors duration-300"
                         >
-                            {tab}
+                            <span className={`transition-colors ${activeTab === tab.id ? 'text-white' : 'text-zinc-400 group-hover:text-white'}`}>
+                                {tab.label}
+                            </span>
+                            <span
+                                className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-500 transition-transform duration-300 ease-out origin-center ${
+                                    activeTab === tab.id ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                                }`}
+                            ></span>
                         </button>
                     ))}
                 </div>
 
-                {/* Status / User */}
-                <div className="flex items-center gap-6">
-                    <div className="text-xs font-mono text-gray-400 hidden md:block">
-                        SERVER: <span className="text-green-400">ONLINE</span>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-gray-800 border border-gray-700"></div>
-                </div>
+                <button className="h-10 px-5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2">
+                    <Download className="w-4 h-4" />
+                    Export
+                </button>
             </div>
         </nav>
     );

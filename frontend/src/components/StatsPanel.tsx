@@ -27,37 +27,35 @@ const StatsPanel: React.FC = () => {
     }, []);
 
     return (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 w-full">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {/* Card 1: Status */}
-            <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center hover:border-blue-500/50 transition-all cursor-default group">
-                <h3 className="text-gray-400 text-sm font-medium mb-2 uppercase tracking-wider">System Status</h3>
-                <span className={`text-2xl font-bold ${stats.status === 'Processing' ? 'text-green-400' : 'text-yellow-400'}`}>
+            <div className="space-y-2">
+                <div className="text-sm text-zinc-500 font-mono uppercase">System Status</div>
+                <div className={`text-3xl font-bold ${stats.status === 'Processing' ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {stats.status}
-                </span>
-                <div className="h-1 w-full bg-gray-800 mt-4 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 w-full animate-pulse-slow"></div>
                 </div>
+                <div className="text-xs text-zinc-600">Real-time</div>
             </div>
 
             {/* Card 2: Wagon Count */}
-            <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center hover:border-purple-500/50 transition-all cursor-default">
-                <h3 className="text-gray-400 text-sm font-medium mb-2 uppercase tracking-wider">Wagons Counted</h3>
-                <span className="text-4xl font-black text-white">{stats.total_wagons}</span>
-                <span className="text-xs text-purple-400 mt-1">Session Total</span>
+            <div className="space-y-2">
+                <div className="text-sm text-zinc-500 font-mono uppercase">Wagons Counted</div>
+                <div className="text-3xl font-bold text-blue-400">{stats.total_wagons}</div>
+                <div className="text-xs text-zinc-600">Session Total</div>
             </div>
 
             {/* Card 3: Last ID */}
-            <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center hover:border-cyan-500/50 transition-all cursor-default">
-                <h3 className="text-gray-400 text-sm font-medium mb-2 uppercase tracking-wider">Last Wagon ID</h3>
-                <span className="text-3xl font-mono font-bold text-cyan-400">{stats.last_wagon_id}</span>
-                <span className="text-xs text-gray-500 mt-1">OCR Confidence: 98%</span>
+            <div className="space-y-2">
+                <div className="text-sm text-zinc-500 font-mono uppercase">Last Wagon ID</div>
+                <div className="text-3xl font-bold text-purple-400">{stats.last_wagon_id}</div>
+                <div className="text-xs text-zinc-600">Latest Scanned</div>
             </div>
 
             {/* Card 4: Defects */}
-            <div className="bg-gray-900/50 backdrop-blur-lg border border-gray-800 p-6 rounded-2xl flex flex-col items-center justify-center hover:border-red-500/50 transition-all cursor-default">
-                <h3 className="text-gray-400 text-sm font-medium mb-2 uppercase tracking-wider">Defects Detected</h3>
-                <span className="text-4xl font-black text-red-500">{stats.defects_found}</span>
-                <span className="text-xs text-red-300 mt-1">Needs Inspection</span>
+            <div className="space-y-2">
+                <div className="text-sm text-zinc-500 font-mono uppercase">Defects Detected</div>
+                <div className="text-3xl font-bold text-amber-400">{stats.defects_found}</div>
+                <div className="text-xs text-zinc-600">Needs Inspection</div>
             </div>
         </div>
     );

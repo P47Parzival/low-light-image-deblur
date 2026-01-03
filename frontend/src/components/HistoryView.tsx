@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { FileText } from 'lucide-react';
 
 // Types matching the Backend API responses
 interface Inspection {
@@ -55,55 +56,49 @@ const HistoryView: React.FC = () => {
 
     if (!selectedInspection) {
         return (
-            <div className="space-y-6 animate-in fade-in duration-500">
-                <div className="flex justify-between items-end">
-                    <div>
-                        <h2 className="text-2xl font-bold text-white">Inspection History</h2>
-                        <p className="text-gray-400 text-sm">Select a past run to view detailed analysis.</p>
-                    </div>
+            <div className="space-y-8 animate-in fade-in duration-500">
+                <div className="flex items-center gap-4 mb-8">
+                    <div className="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
+                    <span className="text-xs tracking-[0.3em] text-purple-400 font-bold uppercase">History Module</span>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-4">
                     {inspections.map((insp) => (
                         <div
                             key={insp.id}
-                            onClick={() => setSelectedInspection(insp.id)}
-                            className="bg-gray-900/50 hover:bg-gray-800 backdrop-blur border border-gray-700 hover:border-blue-500/50 rounded-xl p-6 cursor-pointer transition-all group"
+                            className="bg-zinc-950 border border-zinc-800 rounded-xl p-6 hover:border-zinc-700 transition-all"
                         >
-                            <div className="flex justify-between items-start mb-4">
-                                <span className="bg-gray-800 text-gray-400 text-xs px-2 py-1 rounded font-mono">
-                                    ID: #{insp.id}
-                                </span>
-                                <span className="text-gray-500 text-xs">
-                                    {insp.timestamp}
-                                </span>
-                            </div>
-                            <h3 className="text-lg font-bold text-white mb-2 group-hover:text-blue-400 transition-colors truncate" title={insp.video_name}>
-                                {insp.video_name}
-                            </h3>
-                            <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full bg-blue-500"></span>
-                                <span className="text-sm text-gray-400">Analysis Complete</span>
-                            </div>
-
-                            {/* Download Button */}
-                            <div className="mt-4 pt-4 border-t border-gray-700 flex justify-end">
-                                <button
-                                    onClick={(e) => {
-                                        e.stopPropagation(); // Prevent card click
-                                        window.open(`http://localhost:8000/history/${insp.id}/report`, '_blank');
-                                    }}
-                                    className="text-xs bg-gray-800 hover:bg-gray-700 text-gray-300 px-3 py-1.5 rounded border border-gray-600 transition-colors flex items-center gap-2"
-                                >
-                                    <span>📄</span> Download Report
-                                </button>
+                            <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-12 h-12 bg-zinc-900 rounded-lg flex items-center justify-center">
+                                        <FileText className="w-6 h-6 text-zinc-500" />
+                                    </div>
+                                    <div>
+                                        <div className="font-semibold text-white" title={insp.video_name}>Inspection #{insp.id} - {insp.video_name}</div>
+                                        <div className="text-sm text-zinc-500">{new Date(insp.timestamp).toLocaleString()}</div>
+                                    </div>
+                                </div>
+                                <div className='flex items-center gap-4'>
+                                    <button
+                                        onClick={(e) => {
+                                            e.stopPropagation(); // Prevent card click
+                                            window.open(`http://localhost:8000/history/${insp.id}/report`, '_blank');
+                                        }}
+                                        className="text-xs bg-zinc-800 hover:bg-zinc-700 text-zinc-300 px-3 py-1.5 rounded-md border border-zinc-700 transition-colors"
+                                    >
+                                        Report
+                                    </button>
+                                    <button onClick={() => setSelectedInspection(insp.id)} className="text-sm text-blue-400 hover:text-blue-300 font-medium">
+                                        View Details →
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     ))
                     }
                     {
                         inspections.length === 0 && (
-                            <div className="col-span-full py-12 text-center text-gray-500 border border-dashed border-gray-800 rounded-xl">
+                            <div className="py-12 text-center text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
                                 No inspection history found. Run the pipeline to generate data.
                             </div>
                         )
@@ -119,35 +114,35 @@ const HistoryView: React.FC = () => {
             <div className="flex items-center gap-4 mb-8">
                 <button
                     onClick={() => setSelectedInspection(null)}
-                    className="p-2 hover:bg-gray-800 rounded-lg text-gray-400 hover:text-white transition-colors"
+                    className="p-2 hover:bg-zinc-800 rounded-lg text-zinc-400 hover:text-white transition-colors"
                 >
                     ← Back
                 </button>
                 <div>
                     <h2 className="text-2xl font-bold text-white">Inspection #{selectedInspection}</h2>
-                    <p className="text-gray-400 text-sm">Detailed Wagon Analysis Report</p>
+                    <p className="text-zinc-400 text-sm">Detailed Wagon Analysis Report</p>
                 </div>
             </div>
 
             {loading ? (
-                <div className="text-center py-20 text-gray-500">Loading analysis data...</div>
+                <div className="text-center py-20 text-zinc-500">Loading analysis data...</div>
             ) : (
                 <div className="space-y-12">
                     {/* List of Wagons - Filtered to show only successful OCR */}
                     {wagons
                         .filter(wagon => wagon.ocr_text && wagon.ocr_text !== "OCR Failed")
                         .map((wagon) => (
-                            <div key={wagon.id} className="border-b border-gray-800 pb-12 last:border-0">
+                            <div key={wagon.id} className="border-b border-zinc-800 pb-12 last:border-0">
                                 {/* Wagon Header */}
                                 <div className="flex items-center gap-4 mb-6">
                                     <span className="text-xl font-bold text-white">Wagon #{wagon.wagon_index}</span>
-                                    <span className="text-sm font-mono text-gray-500">{wagon.timestamp}</span>
+                                    <span className="text-sm font-mono text-zinc-500">{new Date(wagon.timestamp).toLocaleString()}</span>
                                 </div>
 
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
 
                                     {/* Info Panel (Reused Logic) */}
-                                    <div className="md:col-span-1 bg-gray-900/50 backdrop-blur border border-gray-800 rounded-2xl p-6 relative overflow-hidden">
+                                    <div className="md:col-span-1 bg-zinc-950/50 backdrop-blur border border-zinc-800 rounded-2xl p-6 relative overflow-hidden">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
                                             <span className="text-9xl font-mono font-bold text-white">DATA</span>
                                         </div>
@@ -158,31 +153,31 @@ const HistoryView: React.FC = () => {
                                         </h3>
 
                                         <div className="space-y-4 font-mono text-sm">
-                                            <div className="bg-white/5 p-4 rounded-lg border border-white/5 space-y-3">
+                                            <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 space-y-3">
                                                 <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                    <span className="text-gray-400">Wagon ID:</span>
+                                                    <span className="text-zinc-400">Wagon ID:</span>
                                                     <span className="text-white font-bold bg-blue-500/20 px-2 py-0.5 rounded border border-blue-500/30">
                                                         {wagon.wagon_index}
                                                     </span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400">OCR Result:</span>
-                                                    <span className="text-green-400 font-bold">
+                                                    <span className="text-zinc-400">OCR Result:</span>
+                                                    <span className="text-emerald-400 font-bold">
                                                         {wagon.ocr_text || "N/A"}
                                                     </span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400">Confidence:</span>
+                                                    <span className="text-zinc-400">Confidence:</span>
                                                     <span className="text-gray-300">
                                                         {wagon.ocr_confidence ? (wagon.ocr_confidence * 100).toFixed(1) : 0}%
                                                     </span>
                                                 </div>
 
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-gray-400">Condition:</span>
-                                                    <div className="flex gap-2">
+                                                    <span className="text-zinc-400">Condition:</span>
+                                                    <div className="flex flex-wrap gap-2">
                                                         {wagon.is_night && (
                                                             <span className="text-xs bg-purple-500/20 text-purple-400 px-2 py-0.5 rounded border border-purple-500/30">
                                                                 Night
@@ -194,7 +189,7 @@ const HistoryView: React.FC = () => {
                                                             </span>
                                                         )}
                                                         {!wagon.is_night && wagon.defects === "None" && (
-                                                            <span className="text-xs bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30">
+                                                            <span className="text-xs bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded border border-emerald-500/30">
                                                                 OK
                                                             </span>
                                                         )}
@@ -205,42 +200,42 @@ const HistoryView: React.FC = () => {
                                     </div>
 
                                     {/* Visual Forensics Grid (Reused Logic) */}
-                                    <div className="md:col-span-2 bg-gray-900/50 backdrop-blur border border-gray-800 rounded-2xl p-6">
+                                    <div className="md:col-span-2 bg-zinc-950/50 backdrop-blur border border-zinc-800 rounded-2xl p-6">
                                         <h3 className="text-lg font-bold text-white mb-6">Visual Forensics</h3>
 
                                         <div className="grid grid-cols-2 gap-4 h-[300px]">
                                             {/* Original / Deblurred View */}
                                             <div className="space-y-2 col-span-1">
-                                                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Original Input</h4>
-                                                <div className="bg-black/40 rounded-lg border border-white/10 h-[260px] flex items-center justify-center relative overflow-hidden group">
+                                                <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Original Input</h4>
+                                                <div className="bg-black/40 rounded-lg border border-zinc-700 h-[260px] flex items-center justify-center relative overflow-hidden group">
                                                     {wagon.original_image_path ? (
                                                         <img src={wagon.original_image_path} className="w-full h-full object-contain" alt="Original" />
                                                     ) : (
-                                                        <span className="text-xs text-gray-500 italic">No Image</span>
+                                                        <span className="text-xs text-zinc-500 italic">No Image</span>
                                                     )}
                                                 </div>
                                             </div>
 
                                             <div className="space-y-2 col-span-1">
-                                                <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Processed Output</h4>
-                                                <div className="bg-black/40 rounded-lg border border-white/10 h-[260px] flex items-center justify-center relative overflow-hidden group">
+                                                <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Processed Output</h4>
+                                                <div className="bg-black/40 rounded-lg border border-zinc-700 h-[260px] flex items-center justify-center relative overflow-hidden group">
                                                     {wagon.deblurred_image_path ? (
                                                         <img src={wagon.deblurred_image_path} className="w-full h-full object-contain" alt="Deblurred" />
                                                     ) : (
-                                                        <span className="text-xs text-gray-500 italic">Processing Skipped / Not Required</span>
+                                                        <span className="text-xs text-zinc-500 italic">Processing Skipped / Not Required</span>
                                                     )}
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* OCR Crop Row */}
-                                        <div className="mt-4 pt-4 border-t border-gray-800">
-                                            <h4 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">OCR Region</h4>
-                                            <div className="bg-black/40 rounded-lg border border-white/10 h-[120px] flex items-center justify-center relative overflow-hidden group">
+                                        <div className="mt-4 pt-4 border-t border-zinc-800">
+                                            <h4 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider mb-2">OCR Region</h4>
+                                            <div className="bg-black/40 rounded-lg border border-zinc-700 h-[120px] flex items-center justify-center relative overflow-hidden group">
                                                 {wagon.cropped_number_path ? (
                                                     <img src={wagon.cropped_number_path} className="h-full object-contain" alt="OCR Crop" />
                                                 ) : (
-                                                    <span className="text-xs text-gray-500 italic">No OCR Data</span>
+                                                    <span className="text-xs text-zinc-500 italic">No OCR Data</span>
                                                 )}
                                             </div>
                                         </div>
@@ -251,7 +246,7 @@ const HistoryView: React.FC = () => {
                         ))}
 
                     {wagons.length === 0 && (
-                        <div className="py-20 text-center text-gray-500">
+                        <div className="py-20 text-center text-zinc-500">
                             No wagons detected in this inspection.
                         </div>
                     )}

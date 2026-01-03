@@ -85,7 +85,7 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
         # Define Model Paths
         model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
         model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
-        deblur_model = os.path.join(base_dir, "NAFnet/NAFNet-GoPro-width64.pth")
+        deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
         
         # Create Inspection Record BEFORE processing (so frontend has an ID)
         inspection_id = database.create_inspection(file.filename)
@@ -139,7 +139,7 @@ async def generate_report_pdf(inspection_id: int):
     
     # Output to bytes
     # The .output() method returns the document as bytes, which is ready for the response.
-    pdf_byte_array = pdf.output()
+    pdf_byte_array = pdf.output(dest='S').encode('latin1')
     pdf_bytes = bytes(pdf_byte_array) # Ensure it's the immutable `bytes` type for the Response
     
     headers = {
@@ -254,7 +254,7 @@ def run_live_pipeline(stream_url, inspection_id):
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
     model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
     model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
-    deblur_model = os.path.join(base_dir, "NAFnet/NAFNet-GoPro-width64.pth")
+    deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
     
     # Run Pipeline
     # Note: cascaded_pipeline handles DB connections internally

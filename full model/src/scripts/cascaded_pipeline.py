@@ -248,10 +248,24 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 f"Blur score: {blur_score:.1f} | "
                                 f"Orig size: {wagon_crop.shape[:2]}"
                             )
-                            wagon_deblur = deblur_engine.deblur(wagon_crop)
+                            # Apply enhanced deblurring with TTA and sharpening
+                            wagon_deblur = deblur_engine.deblur(
+                                wagon_crop,
+                                use_tta=True,        # Enable test-time augmentation for best quality
+                                sharpen_amount=0.6   # Moderate sharpening (0.5-0.8 recommended)
+                            )
+                        else:
+                            # Slightly blurry but above threshold - still apply light enhancement
+                            wagon_deblur = deblur_engine.deblur(
+                                wagon_crop,
+                                use_tta=False,       # Skip TTA for speed
+                                sharpen_amount=0.3   # Light sharpening only
+                            )
                     else:
                         # Even if no deblur engine, log blur score for report
-                         blur_scores_log.append(calculate_blur_score(wagon_crop))
+                        blur_scores_log.append(calculate_blur_score(wagon_crop))
+                        wagon_deblur = wagon_crop.copy()
+
 
                     # Store ONCE per wagon_id
                     wagon_image_cache[wagon_id] = {
@@ -307,9 +321,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
 
                                 # Prepare OCR Crop
-                                # 1. Add Padding (50%)
-                                pad_w = int((nx2 - nx1) * 1.2)
-                                pad_h = int((ny2 - ny1) * 1.0)
+                                # 1. Add Padding 
+                                pad_w = int((nx2 - nx1) * 2.0)
+                                pad_h = int((ny2 - ny1) * 1.8)
                                 px1 = max(0, nx1 - pad_w)
                                 py1 = max(0, ny1 - pad_h)
                                 px2 = min(w, nx2 + pad_w)
@@ -320,7 +334,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 # 2. Dynamic Scaling
                                 if number_img.size > 0:
                                     h_img, w_img = number_img.shape[:2]
-                                    target_height = 96.0
+                                    target_height = 128.0
                                     
                                     if h_img < target_height:
                                         scale_factor = target_height / h_img
@@ -621,7 +635,7 @@ if __name__ == "__main__":
     parser.add_argument("--model_a", default="railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
     # Placeholder for Model B until user trains it
     parser.add_argument("--model_b", default="railway_hackathon_numbers/number_detector_v1/weights/best.pt")
-    parser.add_argument("--deblur_model", default="NAFnet/NAFNet-GoPro-width64.pth")
+    parser.add_argument("--deblur_model", default="finetuned_nafnet/nafnet_wagon_finetuned.pth")
     
     args = parser.parse_args()
     cascaded_pipeline(args.video_path, args.model_a, args.model_b, args.deblur_model)

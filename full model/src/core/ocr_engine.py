@@ -101,7 +101,7 @@ class WagonOCR:
         detected_text = []
         for (bbox, text, confidence) in results:
             print(f"      [EasyOCR Raw] Text: '{text}' | Conf: {confidence:.2f}")
-            if confidence > 0.3 and len(text) >= 1:
+            if confidence > 0.1 and len(text) >= 1:
                 detected_text.append(text)
 
         if not detected_text:

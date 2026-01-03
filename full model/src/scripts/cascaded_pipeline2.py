@@ -8,6 +8,8 @@ import time
 import queue
 from collections import deque
 import numpy as np
+import json
+from paddleocr import PaddleOCR
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -37,6 +39,11 @@ def ocr_worker(input_queue, output_queue):
         
         if raw_text:
             parsed = IndianWagonParser.parse(raw_text)
+
+            # checksum validation can be enabled if needed
+            # if parsed and not IndianWagonParser.validate_checksum(raw_text):
+            #     print(f"[WARNING] Invalid checksum for wagon {raw_text}")
+            #     parsed = None
             output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path))
         else:
             print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
@@ -47,21 +54,29 @@ def ocr_worker(input_queue, output_queue):
 # Cascaded Pipeline
 # -----------------------------
 def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None):
-    if not os.path.exists(video_path):
-        print(f"[ERROR] Video file not found at: {video_path}")
-        print(f"[INFO] Current working directory: {os.getcwd()}")
-        return
+    if not os.path.exists(video_path): return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
     model_a = YOLO(model_a_path)
     
-    print(f"[INFO] Loading Model B (Number): {model_b_path}")
-    # Check if model B exists, if not warn user
-    if not os.path.exists(model_b_path):
-        print(f"[WARNING] Model B not found at {model_b_path}. Number detection will fail.")
+    # Replace Model B with PaddleOCR for text detection
+    print(f"[INFO] Loading PaddleOCR Text Detector")
+    try:
+        paddle_ocr = PaddleOCR(
+            lang='en'
+            # Removed ALL invalid parameters: use_angle_cls, use_gpu, show_log, etc.
+            # PaddleOCR will use default settings
+        )
+        # Note: PaddleOCR will auto-download default models on first run
+        model_b = None  # Not using YOLO Model B anymore
+        print(f"[INFO] ✓ PaddleOCR loaded successfully")
+    except Exception as e:
+        print(f"[ERROR] Failed to load PaddleOCR: {e}")
+        import traceback
+        traceback.print_exc()
+        print(f"[INFO] Falling back to no text detection")
+        paddle_ocr = None
         model_b = None
-    else:
-        model_b = YOLO(model_b_path)
 
     # DeblurGAN Setup
     deblur_engine = None
@@ -109,6 +124,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     # Data Buffers
     unique_wagons = set()
     consist_log = [] # List of dicts: {'id': track_id, 'text': ..., 'parsed': ..., 'time': ...}
+    wagon_timestamps = {} # Map id -> first_detection_time
     
     # Restoring Initialization
     frame_cnt = 0
@@ -117,6 +133,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     wagon_data = {}
     wagon_image_cache = {}
     ocr_requested = set()
+
+    # System Health Logs
+    brightness_log = []
+    blur_scores_log = []
 
     # -----------------------------
     # VIDEO DISPLAY SETTINGS (VLC-like)
@@ -152,6 +172,11 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         
         frame_cnt += 1
         t0 = time.time()
+
+        # Telemetry: Brightness (Sample every 5 frames for speed)
+        if frame_cnt % 5 == 0:
+             # fast mean
+             brightness_log.append(np.mean(frame))
         
         # -----------------------------
         # STEP 1: Model A (Full Frame) - Detect Wagons
@@ -180,15 +205,18 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
                     if 0.03 < ratio < 0.40:
                         active_wagons_list.append((track_id, box))
-                        unique_wagons.add(track_id)
+                        if track_id not in unique_wagons:
+                            unique_wagons.add(track_id)
+                            # Log timestamp for speed calculation
+                            wagon_timestamps[track_id] = t0
                     else:
                         pass
                         # print(f"[DEBUG] Filtered box {track_id} with area ratio {ratio:.3f}")
 
         # -----------------------------
-        # STEP 2: Model B (Crops) - Detect Numbers
+        # STEP 2: PaddleOCR Detection (Crops) - Detect Numbers
         # -----------------------------
-        if model_b:
+        if paddle_ocr:
             for wagon_id, box in active_wagons_list:
                 x1, y1, x2, y2 = map(int, box)
                 h, w = frame.shape[:2]
@@ -223,6 +251,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
                     if deblur_engine:
                         blur_score = calculate_blur_score(wagon_crop)
+                        blur_scores_log.append(blur_score) # Log score
 
                         # Realistic threshold for motion blur
                         if blur_score < 80:
@@ -232,6 +261,9 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 f"Orig size: {wagon_crop.shape[:2]}"
                             )
                             wagon_deblur = deblur_engine.deblur(wagon_crop)
+                    else:
+                        # Even if no deblur engine, log blur score for report
+                         blur_scores_log.append(calculate_blur_score(wagon_crop))
 
                     # Store ONCE per wagon_id
                     wagon_image_cache[wagon_id] = {
@@ -241,7 +273,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     }
 
                 # -----------------------------
-                # RESIZE AFTER DEBLUR (FOR MODEL B & OCR)
+                # RESIZE AFTER DEBLUR (FOR PaddleOCR)
                 # -----------------------------
                 wagon_crop = wagon_deblur
 
@@ -255,83 +287,91 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
 
                 # -----------------------------
-                # NOW run Model B on CLEAN wagon
+                # NOW run PaddleOCR detection on CLEAN wagon
                 # -----------------------------
                 if frame_cnt % 3 == 0:
-                    results_b = model_b.predict(wagon_crop, verbose=False, conf=0.25)
-                    
-                    # DEBUG: Log results
-                    if len(results_b[0].boxes) > 0:
-                        print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
-
-                    # If Number Found (Class 0 in Model B)
-                    for r in results_b:
-                        for nbox in r.boxes.xyxy:
-                            nx1, ny1, nx2, ny2 = map(int, nbox)
+                    try:
+                        result = paddle_ocr.ocr(wagon_crop, cls=True)
+                        
+                        if result and result[0]:  # Text detected
+                            print(f"[DEBUG] Wagon {wagon_id}: PaddleOCR found {len(result[0])} text regions")
                             
-                            # Only trigger OCR once per wagon for now
-                            if wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
-                                # -----------------------------
-                                # PERSISTENCE: Save Images NOW
-                                # -----------------------------
-                                cache = wagon_image_cache[wagon_id] # Retrieve latest cached view
-                                current_ts = cache['ts']
+                            # Process each detected text region
+                            for line in result[0]:
+                                # line[0] contains bounding box coordinates as list of 4 points
+                                box_coords = line[0]
                                 
-                                # Save Original
-                                orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                cv2.imwrite(orig_path, cache['orig'])
+                                # Convert to integer coordinates (find bounding rectangle)
+                                nx1 = int(min([p[0] for p in box_coords]))
+                                ny1 = int(min([p[1] for p in box_coords]))
+                                nx2 = int(max([p[0] for p in box_coords]))
+                                ny2 = int(max([p[1] for p in box_coords]))
                                 
-                                # Save Deblurred
-                                deblur_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                cv2.imwrite(deblur_path, cache['deblur'])
+                                # Only trigger OCR once per wagon for now
+                                if wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
+                                    # -----------------------------
+                                    # PERSISTENCE: Save Images NOW
+                                    # -----------------------------
+                                    cache = wagon_image_cache[wagon_id] # Retrieve latest cached view
+                                    current_ts = cache['ts']
+                                    
+                                    # Save Original
+                                    orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                    cv2.imwrite(orig_path, cache['orig'])
+                                    
+                                    # Save Deblurred
+                                    deblur_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                    cv2.imwrite(deblur_path, cache['deblur'])
 
 
-                                # Prepare OCR Crop
-                                # 1. Add Padding (50%)
-                                pad_w = int((nx2 - nx1) * 1.2)
-                                pad_h = int((ny2 - ny1) * 1.0)
-                                px1 = max(0, nx1 - pad_w)
-                                py1 = max(0, ny1 - pad_h)
-                                px2 = min(w, nx2 + pad_w)
-                                py2 = min(h, ny2 + pad_h)
-                                
-                                number_img = wagon_crop[py1:py2, px1:px2]
-                                
-                                # 2. Dynamic Scaling
-                                if number_img.size > 0:
-                                    h_img, w_img = number_img.shape[:2]
-                                    target_height = 96.0
+                                    # Prepare OCR Crop
+                                    # 1. Add Padding (50%)
+                                    pad_w = int((nx2 - nx1) * 1.2)
+                                    pad_h = int((ny2 - ny1) * 1.0)
+                                    px1 = max(0, nx1 - pad_w)
+                                    py1 = max(0, ny1 - pad_h)
+                                    px2 = min(wagon_crop.shape[1], nx2 + pad_w)
+                                    py2 = min(wagon_crop.shape[0], ny2 + pad_h)
                                     
-                                    if h_img < target_height:
-                                        scale_factor = target_height / h_img
-                                        number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
+                                    number_img = wagon_crop[py1:py2, px1:px2]
                                     
-                                    final_img = number_img
+                                    # 2. Dynamic Scaling
+                                    if number_img.size > 0:
+                                        h_img, w_img = number_img.shape[:2]
+                                        target_height = 96.0
+                                        
+                                        if h_img < target_height:
+                                            scale_factor = target_height / h_img
+                                            number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
+                                        
+                                        final_img = number_img
 
-                                    # User's Modified Deblur/Process Block (Detail Enhance)
-                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
-                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+                                        # User's Modified Deblur/Process Block (Detail Enhance)
+                                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+                                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
 
-                                    # Save OCR Crop
-                                    ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                    cv2.imwrite(ocr_path, final_img)
-                                    
-                                    # Fallback paths for DB (Logic preserved)
-                                    if not deblur_path: deblur_path = ocr_path
-                                    if not orig_path: orig_path = ocr_path 
-                                    
-                                    # Queue for OCR
-                                    print(f"[DEBUG] Queueing OCR for Wagon {wagon_id}")
-                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path))
-                                    ocr_requested.add(wagon_id)
-                                    
-                                    # Cleanup Cache (Optional, keeps memory low)
-                                    # del wagon_data[wagon_id]
-                                    
-                            # Visualization
-                            gx1, gy1 = x1 + nx1, y1 + ny1
-                            gx2, gy2 = x1 + nx2, y1 + ny2
-                            cv2.rectangle(frame, (gx1, gy1), (gx2, gy2), (0, 255, 0), 2)
+                                        # Save OCR Crop
+                                        ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                                        cv2.imwrite(ocr_path, final_img)
+                                        
+                                        # Fallback paths for DB (Logic preserved)
+                                        if not deblur_path: deblur_path = ocr_path
+                                        if not orig_path: orig_path = ocr_path 
+                                        
+                                        # Queue for OCR
+                                        print(f"[DEBUG] Queueing OCR for Wagon {wagon_id}")
+                                        ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path))
+                                        ocr_requested.add(wagon_id)
+                                        
+                                        # Cleanup Cache (Optional, keeps memory low)
+                                        # del wagon_data[wagon_id]
+                                        
+                                # Visualization
+                                gx1, gy1 = x1 + nx1, y1 + ny1
+                                gx2, gy2 = x1 + nx2, y1 + ny2
+                                cv2.rectangle(frame, (gx1, gy1), (gx2, gy2), (0, 255, 0), 2)
+                    except Exception as e:
+                        print(f"[WARNING] PaddleOCR detection failed for wagon {wagon_id}: {e}")
 
 
         metrics['det'].append((time.time()-t0)*1000)
@@ -358,8 +398,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 # Formatted Output
                 parsed_str = str(parsed) if parsed else "Invalid"
                 
-                # log_entry = f"[{det_time}] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str} | Latency: {latency:.2f}s"
-                # print(log_entry)
+                log_entry = f"[{det_time}] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str} | Latency: {latency:.2f}s"
+                print(log_entry)
                 
                 consist_log.append({
                     'id': wagon_id,
@@ -552,8 +592,46 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     print("-" * 50)
     
     # Mark as Completed
+    # Calculate Metrics
+    final_fps = frame_cnt / (time.time() - start_time.timestamp())
+    avg_brightness = np.mean(brightness_log) if brightness_log else 0.0
+    resolution_str = f"{video_width}x{video_height}"
+    
+    # Blur Histogram (Bins: <50, 50-100, 100-200, >200)
+    blur_hist = {'<50': 0, '50-100': 0, '100-200': 0, '>200': 0}
+    if blur_scores_log:
+        for s in blur_scores_log:
+            if s < 50: blur_hist['<50'] += 1
+            elif s < 100: blur_hist['50-100'] += 1
+            elif s < 200: blur_hist['100-200'] += 1
+            else: blur_hist['>200'] += 1
+            
+    blur_stats_json = json.dumps(blur_hist)
+
+    # Train Speed Calculation (Robust Inter-Wagon Timing)
+    # Speed = Wagon Length (14.7m) / Avg Time Gap
+    calculated_speed = 0.0
+    
+    if len(wagon_timestamps) > 2:
+        # Sort by timestamp
+        times = sorted(wagon_timestamps.values())
+        deltas = []
+        for i in range(1, len(times)):
+            d = times[i] - times[i-1]
+            if 0.5 < d < 5.0: # Filter outliers (e.g. stops or missed detections)
+                deltas.append(d)
+        
+        if len(deltas) > 0:
+            avg_delta = sum(deltas) / len(deltas)
+            if avg_delta > 0:
+                speed_mps = 14.7 / avg_delta
+                calculated_speed = speed_mps * 3.6 # Convert to km/h
+                print(f"[INFO] Estimated Train Speed: {calculated_speed:.1f} km/h (Avg Gap: {avg_delta:.2f}s)")
+
+    # Mark as Completed & Save Metrics
     database.update_inspection_count(inspection_id, total_wagons)
     database.update_inspection_status(inspection_id, "COMPLETED")
+    database.update_inspection_metrics(inspection_id, final_fps, resolution_str, avg_brightness, blur_stats_json, calculated_speed)
 
 if __name__ == "__main__":
     mp.set_start_method("spawn", force=True)

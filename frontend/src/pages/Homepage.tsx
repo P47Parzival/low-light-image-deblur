@@ -284,7 +284,7 @@ const RailVisionLanding = () => {
             {/* Row 1: Video Left, Title Right - Wagon Fault Detection */}
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div className="relative group">
-                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-2xl animate-pulse"></div>
                 <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-blue-500/10">
                   <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
                     <div className="flex items-center gap-3">
@@ -311,7 +311,7 @@ const RailVisionLanding = () => {
                   </video>
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-6 lg:pl-35">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-transparent"></div>
                   <span className="text-xs tracking-[0.3em] text-blue-400 font-bold uppercase">AI-Powered</span>
@@ -364,7 +364,7 @@ const RailVisionLanding = () => {
                 </div>
               </div>
               <div className="relative group order-1 lg:order-2">
-                <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 blur-2xl animate-pulse"></div>
                 <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-purple-500/10">
                   <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
                     <div className="flex items-center gap-3">
@@ -396,7 +396,7 @@ const RailVisionLanding = () => {
             {/* Row 3: Video Left, Title Right - Wagon OCR Detection */}
             <div className="grid lg:grid-cols-2 gap-16 items-center">
               <div className="relative group">
-                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl animate-pulse"></div>
                 <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-emerald-500/10">
                   <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
                     <div className="flex items-center gap-3">
@@ -423,7 +423,7 @@ const RailVisionLanding = () => {
                   </video>
                 </div>
               </div>
-              <div className="space-y-6">
+              <div className="space-y-6 lg:pl-35">
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-0.5 bg-gradient-to-r from-emerald-500 to-transparent"></div>
                   <span className="text-xs tracking-[0.3em] text-emerald-400 font-bold uppercase">High Precision</span>

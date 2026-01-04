@@ -27,21 +27,21 @@ const RailVisionLanding = () => {
     return () => clearInterval(interval);
   }, []);
 
-  
 
- // REPLACE YOUR ENTIRE metrics CONST WITH THIS:
-const metrics = [
-  { label: 'OCR Precision', value: '99.4', unit: '%', change: '+2.1%', color: 'text-emerald-400' },
-  { label: 'Edge Latency', value: '12', unit: 'ms', change: '-4ms', color: 'text-blue-400' },
-  { label: 'Velocity Cap', value: '80', unit: 'km/h', change: 'Stable', color: 'text-purple-400' },
-  { label: 'Blur Recovery', value: '3.4x', unit: 'Gain', change: '+0.8', color: 'text-amber-400' }
-];
+
+  // REPLACE YOUR ENTIRE metrics CONST WITH THIS:
+  const metrics = [
+    { label: 'OCR Precision', value: '99.4', unit: '%', change: '+2.1%', color: 'text-emerald-400' },
+    { label: 'Edge Latency', value: '12', unit: 'ms', change: '-4ms', color: 'text-blue-400' },
+    { label: 'Velocity Cap', value: '80', unit: 'km/h', change: 'Stable', color: 'text-purple-400' },
+    { label: 'Blur Recovery', value: '3.4x', unit: 'Gain', change: '+0.8', color: 'text-amber-400' }
+  ];
 
   return (
     <div className="bg-black text-white overflow-x-hidden">
       {/* Dynamic gradient background that follows mouse */}
       <div className="fixed inset-0 opacity-30 pointer-events-none">
-        <div 
+        <div
           className="absolute w-[1000px] h-[1000px] rounded-full blur-[150px] transition-all duration-500 ease-out"
           style={{
             background: 'radial-gradient(circle, rgba(59,130,246,0.2) 0%, transparent 70%)',
@@ -49,7 +49,7 @@ const metrics = [
             top: `${mousePosition.y - 500}px`,
           }}
         ></div>
-        <div 
+        <div
           className="absolute w-[800px] h-[800px] rounded-full blur-[120px] transition-all duration-700 ease-out"
           style={{
             background: 'radial-gradient(circle, rgba(168,85,247,0.15) 0%, transparent 70%)',
@@ -83,7 +83,7 @@ const metrics = [
               Garud
             </span>
           </div>
-          
+
           <nav className="hidden lg:flex items-center gap-10 text-sm font-medium">
             <a href="#solution" className="text-zinc-300 hover:text-white transition-all hover:scale-105 tracking-wide relative group">
               SOLUTION
@@ -127,7 +127,7 @@ const metrics = [
                     Next-Gen Railway Intelligence
                   </span>
                 </div>
-                
+
                 <h1 className="text-7xl xl:text-8xl font-black leading-[0.95] tracking-tighter">
                   <span className="bg-gradient-to-r from-white via-zinc-100 to-zinc-400 bg-clip-text text-transparent">
                     HIGH-SPEED
@@ -139,61 +139,46 @@ const metrics = [
                   <br />
                   <span className="text-zinc-600 font-light">SYNTHESIS</span>
                 </h1>
-                
+
                 <p className="text-xl text-zinc-300 leading-relaxed max-w-xl font-light">
-                 Industrial-grade AI specifically engineered to eliminate motion blur from high-speed wagon feeds.
+                  Industrial-grade AI specifically engineered to eliminate motion blur from high-speed wagon feeds.
                   <span className="text-white font-medium"> Restoring visual clarity for OCR and damage detection on the Edge. </span>
                   <span className="text-blue-400">Powered by advanced neural networks.</span>
                 </p>
-              </div>
-
-              <div className="flex items-center gap-5">
-                <button className="h-16 px-10 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold transition-all flex items-center gap-3 group shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 hover:scale-105">
-                  <Play className="w-5 h-5 group-hover:scale-110 transition-transform" />
-                  <span className="tracking-wide">WATCH DEMO</span>
-                </button>
-                <button className="h-16 px-10 border-2 border-zinc-700 hover:border-blue-500 transition-all flex items-center gap-3 group backdrop-blur-sm bg-zinc-900/50 hover:bg-zinc-900 hover:scale-105">
-                  <span className="tracking-wide font-semibold">DOCUMENTATION</span>
-                  <ChevronRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
-                </button>
               </div>
 
               {/* Live Metrics - Enhanced */}
               <div className="pt-10 border-t border-zinc-800/50">
                 <div className="grid grid-cols-4 gap-6">
                   {metrics.map((metric, idx) => (
-                    <div 
+                    <div
                       key={idx}
-                      className={`transition-all duration-700 cursor-pointer group ${
-                        activeMetric === idx 
-                          ? 'opacity-100 scale-105' 
-                          : 'opacity-50 hover:opacity-75'
-                      }`}
+                      className={`transition-all duration-700 cursor-pointer group ${activeMetric === idx
+                        ? 'opacity-100 scale-105'
+                        : 'opacity-50 hover:opacity-75'
+                        }`}
                     >
                       <div className="relative">
-                        <div className={`text-3xl font-bold tracking-tight flex items-baseline gap-1 ${
-                          activeMetric === idx ? metric.color : 'text-zinc-400'
-                        } transition-colors`}>
+                        <div className={`text-3xl font-bold tracking-tight flex items-baseline gap-1 ${activeMetric === idx ? metric.color : 'text-zinc-400'
+                          } transition-colors`}>
                           {metric.value}
                           <span className="text-sm text-zinc-600">{metric.unit}</span>
                         </div>
                         {activeMetric === idx && (
-                          <div className={`absolute -bottom-1 left-0 h-0.5 w-full bg-gradient-to-r ${
-                            metric.color.includes('emerald') ? 'from-emerald-500' :
+                          <div className={`absolute -bottom-1 left-0 h-0.5 w-full bg-gradient-to-r ${metric.color.includes('emerald') ? 'from-emerald-500' :
                             metric.color.includes('blue') ? 'from-blue-500' :
-                            metric.color.includes('purple') ? 'from-purple-500' :
-                            'from-amber-500'
-                          } to-transparent`}></div>
+                              metric.color.includes('purple') ? 'from-purple-500' :
+                                'from-amber-500'
+                            } to-transparent`}></div>
                         )}
                       </div>
                       <div className="text-xs text-zinc-500 mt-2 font-mono uppercase tracking-wider">
                         {metric.label}
                       </div>
-                      <div className={`text-xs mt-1.5 font-mono font-semibold ${
-                        metric.change.startsWith('+') && !metric.label.includes('Incidents') 
-                          ? 'text-emerald-400' 
-                          : 'text-blue-400'
-                      }`}>
+                      <div className={`text-xs mt-1.5 font-mono font-semibold ${metric.change.startsWith('+') && !metric.label.includes('Incidents')
+                        ? 'text-emerald-400'
+                        : 'text-blue-400'
+                        }`}>
                         {metric.change}
                       </div>
                     </div>
@@ -223,7 +208,7 @@ const metrics = [
             >
               {/* Ambient glow */}
               <div className="absolute -inset-8 bg-gradient-to-br from-blue-500/30 via-purple-500/20 to-transparent blur-[80px] animate-pulse"></div>
-              
+
               <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-blue-500/20 w-[700px] h-[400px]">
                 {/* Terminal header */}
                 <div className="border-b border-zinc-800 px-5 py-4 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
@@ -242,14 +227,14 @@ const metrics = [
                     <span className="text-xs font-mono text-red-400 font-bold tracking-wider">DEBLUR ACTIVE</span>
                   </div>
                 </div>
-                
+
                 {/* Canvas */}
-               <div className="relative aspect-video bg-black w-full h-full">
-                  <video 
+                <div className="relative aspect-video bg-black w-full h-full">
+                  <video
                     ref={videoRef}
-                    autoPlay 
-                    muted 
-                    loop 
+                    autoPlay
+                    muted
+                    loop
                     playsInline
                     className="w-full h-full object-cover opacity-80"
                   >
@@ -257,13 +242,13 @@ const metrics = [
                     <source src="..\assets\landing_vid.mp4" type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
-                  
+
                   {/* Optional Overlay scanning line (CSS based) */}
                   <div className="absolute inset-0 pointer-events-none overflow-hidden">
                     <div className="w-full h-[2px] bg-blue-500/50 shadow-[0_0_15px_rgba(59,130,246,0.5)] animate-scan"></div>
                   </div>
-                  </div>
-                
+                </div>
+
                 {/* Enhanced stats footer */}
                 <div className="border-t border-zinc-800 px-5 py-3 flex items-center justify-between text-xs font-mono bg-gradient-to-r from-zinc-950 to-zinc-900">
                   <div className="flex items-center gap-2">
@@ -286,6 +271,184 @@ const metrics = [
                 <div className="text-xs text-zinc-500 mt-1">Avg Latency</div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Video Showcase Section */}
+      <section className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-b from-black via-zinc-950 to-black"></div>
+        <div className="max-w-[1400px] mx-auto px-8 relative">
+          <div className="space-y-24">
+
+            {/* Row 1: Video Left, Title Right - Wagon Fault Detection */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-purple-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-blue-500/10">
+                  <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                      </div>
+                      <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">FAULT DETECTION FEED</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-mono text-red-400">LIVE</span>
+                    </div>
+                  </div>
+                  <video
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full aspect-video object-cover"
+                  >
+                    <source src="../assets/wagon_fault_detection.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-blue-500 to-transparent"></div>
+                  <span className="text-xs tracking-[0.3em] text-blue-400 font-bold uppercase">AI-Powered</span>
+                </div>
+                <h3 className="text-5xl xl:text-6xl font-black tracking-tight leading-[1.1]">
+                  <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">Wagon Fault</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Detection</span>
+                </h3>
+                <p className="text-lg text-zinc-400 leading-relaxed max-w-lg">
+                  Real-time structural damage detection using advanced computer vision. Automatically identifies floor defects, door damage, and wagon anomalies with 99.94% accuracy.
+                </p>
+                <div className="flex items-center gap-6 pt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">18 Defect Categories</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">Real-time Analysis</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 2: Title Left, Video Right - Wagon Night Detection */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div className="space-y-6 order-2 lg:order-1">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
+                  <span className="text-xs tracking-[0.3em] text-purple-400 font-bold uppercase">24/7 Operations</span>
+                </div>
+                <h3 className="text-5xl xl:text-6xl font-black tracking-tight leading-[1.1]">
+                  <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">Wagon Night</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">Detection</span>
+                </h3>
+                <p className="text-lg text-zinc-400 leading-relaxed max-w-lg">
+                  Advanced low-light vision enhancement for uninterrupted night operations. Our AI adapts to challenging lighting conditions, ensuring consistent detection accuracy around the clock.
+                </p>
+                <div className="flex items-center gap-6 pt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-purple-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">Low-Light Enhanced</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-pink-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">24/7 Monitoring</span>
+                  </div>
+                </div>
+              </div>
+              <div className="relative group order-1 lg:order-2">
+                <div className="absolute -inset-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-purple-500/10">
+                  <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                      </div>
+                      <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">NIGHT VISION FEED</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-mono text-red-400">LIVE</span>
+                    </div>
+                  </div>
+                  <video
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full aspect-video object-cover"
+                  >
+                    <source src="../assets/wagon_night_detection.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+            </div>
+
+            {/* Row 3: Video Left, Title Right - Wagon OCR Detection */}
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div className="relative group">
+                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-emerald-500/10">
+                  <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
+                    <div className="flex items-center gap-3">
+                      <div className="flex gap-1.5">
+                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                      </div>
+                      <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">OCR DETECTION FEED</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                      <span className="text-xs font-mono text-red-400">LIVE</span>
+                    </div>
+                  </div>
+                  <video
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    className="w-full aspect-video object-cover"
+                  >
+                    <source src="../assets/wagon_ocr_detection.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+              <div className="space-y-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-0.5 bg-gradient-to-r from-emerald-500 to-transparent"></div>
+                  <span className="text-xs tracking-[0.3em] text-emerald-400 font-bold uppercase">High Precision</span>
+                </div>
+                <h3 className="text-5xl xl:text-6xl font-black tracking-tight leading-[1.1]">
+                  <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">Wagon OCR</span>
+                  <br />
+                  <span className="bg-gradient-to-r from-emerald-400 to-cyan-400 bg-clip-text text-transparent">Detection</span>
+                </h3>
+                <p className="text-lg text-zinc-400 leading-relaxed max-w-lg">
+                  Precision wagon number extraction even at high speeds. Our motion-blur resistant OCR technology achieves 99.4% accuracy, enabling seamless tracking and identification.
+                </p>
+                <div className="flex items-center gap-6 pt-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">99.4% OCR Accuracy</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 bg-cyan-500 rounded-full"></div>
+                    <span className="text-sm text-zinc-500 font-mono">Motion-Blur Resistant</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
           </div>
         </div>
       </section>
@@ -332,7 +495,7 @@ const metrics = [
               <span className="text-zinc-600 font-light">Intelligence Platform</span>
             </h2>
             <p className="text-xl text-zinc-400 max-w-3xl leading-relaxed">
-              Comprehensive AI infrastructure designed for mission-critical railway operations. 
+              Comprehensive AI infrastructure designed for mission-critical railway operations.
               Built on cutting-edge deep learning with enterprise security at its core.
             </p>
           </div>
@@ -367,20 +530,20 @@ const metrics = [
                 iconBg: 'from-emerald-600 to-green-600'
               }
             ].map((item, idx) => (
-              <div 
-                key={idx} 
+              <div
+                key={idx}
                 className={`relative bg-zinc-950 border ${item.border} p-10 hover:scale-105 transition-all duration-500 group overflow-hidden`}
               >
                 <div className={`absolute inset-0 bg-gradient-to-br ${item.gradient} opacity-0 group-hover:opacity-100 transition-opacity`}></div>
-                
+
                 <div className="relative">
                   <div className={`w-14 h-14 bg-gradient-to-br ${item.iconBg} rounded-xl flex items-center justify-center shadow-lg mb-8 group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
                     <item.icon className="w-7 h-7 text-white" />
                   </div>
-                  
+
                   <h3 className="text-2xl font-bold mb-4 tracking-tight text-white">{item.title}</h3>
                   <p className="text-zinc-400 leading-relaxed mb-8 text-sm">{item.desc}</p>
-                  
+
                   <div className="space-y-3 pt-6 border-t border-zinc-800/50">
                     {item.stats.map((stat, i) => (
                       <div key={i} className="flex items-center gap-3 text-xs text-zinc-500 font-mono group-hover:text-zinc-400 transition-colors">
@@ -399,7 +562,7 @@ const metrics = [
       {/* Technology Stack - Premium Layout */}
       <section id="technology" className="py-10 bg-gradient-to-b from-zinc-950 to-black relative overflow-hidden">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_50%,rgba(59,130,246,0.1),transparent_50%)]"></div>
-        
+
         <div className="max-w-[1400px] mx-auto px-8 relative">
           <div className="grid lg:grid-cols-2 gap-24 items-center">
             <div className="space-y-10">
@@ -407,7 +570,7 @@ const metrics = [
                 <div className="w-20 h-0.5 bg-gradient-to-r from-purple-500 to-transparent"></div>
                 <span className="text-xs tracking-[0.3em] text-purple-400 font-bold uppercase">Tech Stack</span>
               </div>
-              
+
               <h2 className="text-6xl font-black tracking-tight leading-tight">
                 <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">
                   Engineered for
@@ -417,29 +580,29 @@ const metrics = [
                   Scale & Speed
                 </span>
               </h2>
-              
+
               <p className="text-zinc-400 leading-relaxed text-lg max-w-lg">
-                Cloud-native microservices architecture with distributed computing. 
+                Cloud-native microservices architecture with distributed computing.
                 Process millions of frames daily with guaranteed 99.99% uptime and sub-second global latency.
               </p>
 
               <div className="space-y-8 pt-8">
                 {[
-                  { 
-                    label: 'Restoration Pipeline', 
-                    tech: 'GANs • Kernel Estimation • PyTorch', 
+                  {
+                    label: 'Restoration Pipeline',
+                    tech: 'GANs • Kernel Estimation • PyTorch',
                     metric: '623ms inference',
                     color: 'border-blue-500'
                   },
-                  { 
-                    label: 'Edge Optimization', 
-                    tech: 'NVIDIA TensorRT • DeepStream SDK', 
+                  {
+                    label: 'Edge Optimization',
+                    tech: 'NVIDIA TensorRT • DeepStream SDK',
                     metric: '99.99% uptime',
                     color: 'border-purple-500'
                   },
-                  { 
-                    label: 'Analytics Suite', 
-                    tech: 'Post-Op Analytics • Dashboard • SQL', 
+                  {
+                    label: 'Analytics Suite',
+                    tech: 'Post-Op Analytics • Dashboard • SQL',
                     metric: '25M events/day',
                     color: 'border-pink-500'
                   }
@@ -473,7 +636,7 @@ const metrics = [
               ].map((metric, idx) => (
                 <div key={idx} className="bg-zinc-950 border border-zinc-800 p-8 hover:border-zinc-700 transition-all group overflow-hidden relative">
                   <div className={`absolute inset-0 ${metric.color} opacity-0 group-hover:opacity-5 transition-opacity`}></div>
-                  
+
                   <div className="flex items-baseline justify-between mb-5 relative">
                     <span className="text-sm text-zinc-400 tracking-wider font-medium uppercase">{metric.label}</span>
                     <span className="text-4xl font-bold tracking-tight">
@@ -481,7 +644,7 @@ const metrics = [
                       <span className="text-base text-zinc-600 ml-2 font-normal">{metric.unit}</span>
                     </span>
                   </div>
-                  
+
                   <div className="h-2 bg-zinc-900 overflow-hidden rounded-full relative">
                     <div
                       className={`h-full ${metric.color} transition-all duration-1000 rounded-full shadow-lg`}
@@ -497,38 +660,18 @@ const metrics = [
         </div>
       </section>
 
-      {/* Social Proof / Partners */}
-      <section id="partners" className="py-32 border-y border-zinc-800/50">
-        <div className="max-w-[1400px] mx-auto px-8">
-          <div className="text-center mb-16">
-            <p className="text-sm text-zinc-500 font-mono uppercase tracking-widest mb-4">Trusted By Industry Leaders</p>
-            <h3 className="text-3xl font-bold text-zinc-300">Powering Railway Operations Globally</h3>
-          </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-12 items-center">
-            {[...Array(8)].map((_, idx) => (
-              <div key={idx} className="h-24 bg-zinc-900/50 border border-zinc-800 flex items-center justify-center text-zinc-600 hover:text-zinc-400 hover:border-zinc-700 transition-all group cursor-pointer">
-                <span className="text-2xl font-bold tracking-tighter opacity-30 group-hover:opacity-50 transition-opacity">
-                  PARTNER {idx + 1}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
       {/* Premium CTA */}
       <section id="enterprise" className="py-20 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-950/30 via-purple-950/20 to-transparent"></div>
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(168,85,247,0.15),transparent_50%)]"></div>
-        
+
         <div className="max-w-[1400px] mx-auto px-8 relative">
           <div className="max-w-4xl">
             <div className="flex items-center gap-4 mb-10">
               <div className="w-20 h-0.5 bg-gradient-to-r from-blue-500 to-transparent"></div>
               <span className="text-xs tracking-[0.3em] text-blue-400 font-bold uppercase">Get Started</span>
             </div>
-            
+
             <h2 className="text-7xl font-black tracking-tight mb-10 leading-[1.1]">
               <span className="bg-gradient-to-r from-white to-zinc-300 bg-clip-text text-transparent">
                 Transform Your
@@ -538,9 +681,9 @@ const metrics = [
                 Railway Operations
               </span>
             </h2>
-            
+
             <p className="text-2xl text-zinc-300 leading-relaxed mb-16 max-w-3xl font-light">
-              Join 200+ railway operators who've modernized their infrastructure with AI. 
+              Join 200+ railway operators who've modernized their infrastructure with AI.
               <span className="text-white font-medium"> Schedule a personalized demonstration </span>
               and see the platform in action.
             </p>
@@ -558,22 +701,6 @@ const metrics = [
                 CONTACT SALES →
               </button>
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-10 pt-16 border-t border-zinc-800/50">
-              {[
-                { value: '73%', label: 'Reduced Downtime', sublabel: 'Industry Average' },
-                { value: '$4.2M', label: 'Annual ROI', sublabel: 'Enterprise Tier' },
-                { value: '< 24h', label: 'Deployment', sublabel: 'Cloud Setup' }
-              ].map((stat, idx) => (
-                <div key={idx} className="group cursor-pointer">
-                  <div className="text-5xl font-black mb-3 bg-gradient-to-r from-white to-zinc-500 bg-clip-text text-transparent group-hover:from-blue-400 group-hover:to-purple-400 transition-all">
-                    {stat.value}
-                  </div>
-                  <div className="text-sm text-zinc-400 font-bold uppercase tracking-wider">{stat.label}</div>
-                  <div className="text-xs text-zinc-600 mt-1">{stat.sublabel}</div>
-                </div>
-              ))}
-            </div>
           </div>
         </div>
       </section>
@@ -584,61 +711,27 @@ const metrics = [
           <div className="grid md:grid-cols-4 gap-12 mb-16">
             <div className="md:col-span-2">
               {/* Footer Logo Section */}
-            <div className="flex items-center gap-3 mb-6">
-            <div className="w-20 h-10 flex items-center justify-center">
-                <img 
-                src="PhotoshopExtension_Image (1).png" 
-                alt="Garud Logo" 
-                className="w-full h-full object-contain opacity-90" 
-                />
-            </div>
-            <span className="text-4xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-500">
-                Garud
-            </span>
-            </div>
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-20 h-10 flex items-center justify-center">
+                  <img
+                    src="PhotoshopExtension_Image (1).png"
+                    alt="Garud Logo"
+                    className="w-full h-full object-contain opacity-90"
+                  />
+                </div>
+                <span className="text-4xl font-black tracking-tighter bg-clip-text text-transparent bg-gradient-to-r from-white to-zinc-500">
+                  Garud
+                </span>
+              </div>
               <p className="text-zinc-500 text-sm leading-relaxed max-w-md mb-6">
                 Next-generation AI-powered railway intelligence platform. Trusted by industry leaders worldwide for mission-critical operations.
               </p>
-              <div className="flex items-center gap-4">
-                {['LinkedIn', 'Twitter', 'GitHub'].map((social, idx) => (
-                  <a key={idx} href="#" className="text-zinc-600 hover:text-white transition-colors text-sm">
-                    {social}
-                  </a>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Product</h4>
-              <div className="space-y-3">
-                {['Features', 'Pricing', 'Case Studies', 'Documentation'].map((link, idx) => (
-                  <a key={idx} href="#" className="block text-sm text-zinc-500 hover:text-white transition-colors">
-                    {link}
-                  </a>
-                ))}
-              </div>
-            </div>
-            
-            <div>
-              <h4 className="text-sm font-bold text-white mb-4 uppercase tracking-wider">Company</h4>
-              <div className="space-y-3">
-                {['About', 'Careers', 'Press', 'Contact'].map((link, idx) => (
-                  <a key={idx} href="#" className="block text-sm text-zinc-500 hover:text-white transition-colors">
-                    {link}
-                  </a>
-                ))}
-              </div>
             </div>
           </div>
-          
+
           <div className="pt-8 border-t border-zinc-800/50 flex flex-col md:flex-row items-center justify-between gap-4">
             <div className="text-xs text-zinc-600 font-mono">
               © 2026 GARUD. All rights reserved.
-            </div>
-            <div className="flex items-center gap-6 text-xs text-zinc-600">
-              <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-              <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
-              <a href="#" className="hover:text-white transition-colors">Cookie Settings</a>
             </div>
           </div>
         </div>

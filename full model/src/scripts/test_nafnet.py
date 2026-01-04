@@ -256,3 +256,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# command to test the code 
+# python src/scripts/test_nafnet.py -i "wagon_number_dataset/images/wagon_OCR_video_1_f000070_id3.jpg" -o "output.jpg" -m "finetuned_nafnet/nafnet_wagon_finetuned.pth" --tta --sharpen 0.8 --save-comparison

@@ -395,32 +395,65 @@ const RailVisionLanding = () => {
 
             {/* Row 3: Video Left, Title Right - Wagon OCR Detection */}
             <div className="grid lg:grid-cols-2 gap-16 items-center">
-              <div className="relative group">
-                <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-                <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-emerald-500/10">
-                  <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
-                    <div className="flex items-center gap-3">
-                      <div className="flex gap-1.5">
-                        <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
-                        <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+              <div className="relative group space-y-6">
+                {/* First OCR Video */}
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-emerald-500/10">
+                    <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                        </div>
+                        <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">OCR DETECTION FEED #1</span>
                       </div>
-                      <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">OCR DETECTION FEED</span>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs font-mono text-red-400">LIVE</span>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                      <span className="text-xs font-mono text-red-400">LIVE</span>
-                    </div>
+                    <video
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="w-full aspect-video object-cover"
+                    >
+                      <source src="../assets/wagon_ocr_detection.mp4" type="video/mp4" />
+                    </video>
                   </div>
-                  <video
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    className="w-full aspect-video object-cover"
-                  >
-                    <source src="../assets/wagon_ocr_detection.mp4" type="video/mp4" />
-                  </video>
+                </div>
+
+                {/* Second OCR Video */}
+                <div className="relative">
+                  <div className="absolute -inset-4 bg-gradient-to-r from-emerald-500/20 to-cyan-500/20 blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                  <div className="relative bg-zinc-950 border border-zinc-800/50 overflow-hidden shadow-2xl shadow-emerald-500/10">
+                    <div className="border-b border-zinc-800 px-4 py-3 flex items-center justify-between bg-gradient-to-r from-zinc-900 to-zinc-950">
+                      <div className="flex items-center gap-3">
+                        <div className="flex gap-1.5">
+                          <div className="w-2.5 h-2.5 rounded-full bg-red-500"></div>
+                          <div className="w-2.5 h-2.5 rounded-full bg-yellow-500"></div>
+                          <div className="w-2.5 h-2.5 rounded-full bg-green-500"></div>
+                        </div>
+                        <span className="text-xs font-mono text-zinc-500 uppercase tracking-wider">OCR DETECTION FEED #2</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                        <span className="text-xs font-mono text-red-400">LIVE</span>
+                      </div>
+                    </div>
+                    <video
+                      autoPlay
+                      muted
+                      loop
+                      playsInline
+                      className="w-full aspect-video object-cover"
+                    >
+                      <source src="../assets/wagon_number_detection2.mp4" type="video/mp4" />
+                    </video>
+                  </div>
                 </div>
               </div>
               <div className="space-y-6">

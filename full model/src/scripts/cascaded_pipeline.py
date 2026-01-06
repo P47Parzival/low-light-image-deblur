@@ -52,7 +52,7 @@ def ocr_worker(input_queue, output_queue):
 # -----------------------------
 # Cascaded Pipeline
 # -----------------------------
-def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None):
+def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None, frame_queue=None):
     if not os.path.exists(video_path): return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
@@ -292,7 +292,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 # NOW run Model B on CLEAN wagon
                 # -----------------------------
                 if frame_cnt % 3 == 0:
-                    results_b = model_b.predict(wagon_crop, verbose=False, conf=0.25)
+                    results_b = model_b.predict(wagon_crop, verbose=False, conf=0.19)
                     
                     # DEBUG: Log results
                     if len(results_b[0].boxes) > 0:
@@ -498,11 +498,27 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 print("[INFO] Paused. Press any key to continue...")
                 cv2.waitKey(0)
 
+        # STREAMING: If frame_queue provided, encode and push
+        if frame_queue is not None:
+             try:
+                ret, buffer = cv2.imencode('.jpg', frame)
+                if ret:
+                    if frame_queue.full():
+                        try: frame_queue.get_nowait() # Drop old frame if full
+                        except: pass
+                    frame_queue.put(buffer.tobytes())
+             except Exception as e:
+                 print(f"[WARNING] Stream encode failed: {e}")
+
     ocr_in_q.put(None)
     ocr_p.join()
     cap.release()
     if not headless:
         cv2.destroyAllWindows()
+    
+    # Signal End of Stream
+    if frame_queue:
+        frame_queue.put(None)
     
     # ---------------------------------------------------------
     # Generate Final Report
@@ -632,7 +648,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--video_path", required=True)
     # Default Paths
-    parser.add_argument("--model_a", default="railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
+    parser.add_argument("--model_a", default="railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
     # Placeholder for Model B until user trains it
     parser.add_argument("--model_b", default="railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt")
     parser.add_argument("--deblur_model", default="finetuned_nafnet/nafnet_wagon_finetuned.pth")

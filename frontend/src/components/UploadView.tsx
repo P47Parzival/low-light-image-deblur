@@ -93,7 +93,7 @@ const UploadView: React.FC = () => {
             {/* If no file is selected, show the big upload button */}
             {!file && (
                 <div className="border-2 border-dashed border-zinc-800 rounded-2xl p-16 text-center hover:border-zinc-700 transition-all bg-zinc-950/50 relative">
-                     <input
+                    <input
                         type="file"
                         accept="video/*"
                         className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
@@ -114,19 +114,29 @@ const UploadView: React.FC = () => {
 
             {/* If a file is selected, show preview and controls */}
             {previewUrl && (
-                 <div className="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden flex flex-col gap-4">
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden flex flex-col gap-4">
                     <h3 className="text-sm font-bold text-zinc-400 uppercase">Preview &amp; Process</h3>
 
-                    {/* Video Wrapper with Overlay */}
+                    {/* Video Wrapper with Overlay or Stream */}
                     <div className="flex-1 bg-black rounded-lg overflow-hidden border border-zinc-700 relative aspect-video">
-                        <video src={previewUrl} controls className="w-full h-full object-contain" />
-
-                        {processing && (
-                            <div className="absolute inset-0 bg-black/80 flex flex-col items-center justify-center z-20 backdrop-blur-sm animate-in fade-in">
-                                <div className="w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
-                                <span className="text-blue-400 font-mono animate-pulse">AI PROCESSING PIPELINE RUNNING</span>
-                                <span className="text-xs text-zinc-500 mt-2">Checking Wagons, OCR, Defects...</span>
+                        {processing && inspectionId ? (
+                            <div className="absolute inset-0 z-20 bg-black flex flex-col items-center justify-center">
+                                {/* Use MJPEG Stream for Live Preview */}
+                                <img
+                                    src={`http://localhost:8000/stream/processing/${inspectionId}`}
+                                    alt="Live Processing Feed"
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => {
+                                        // Fallback if stream fails
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                                <div className="absolute bottom-4 right-4 bg-black/70 px-3 py-1 text-xs text-green-400 font-mono rounded border border-green-900 animate-pulse">
+                                    LIVE PROCESSING
+                                </div>
                             </div>
+                        ) : (
+                            <video src={previewUrl} controls className="w-full h-full object-contain" />
                         )}
                     </div>
 

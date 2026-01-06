@@ -2,6 +2,11 @@ from fpdf import FPDF
 import datetime
 import json
 import os
+import sys
+
+# Add project root for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from src.core.indian_railways import IndianWagonParser
 
 class PDFReport(FPDF):
     def header(self):
@@ -147,21 +152,32 @@ def generate_report(inspection, wagons):
     pdf.ln(5)
 
     # Table Header
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(20, 10, 'Index', 1)
-    pdf.cell(50, 10, 'OCR Result', 1)
-    pdf.cell(30, 10, 'Confidence', 1)
-    pdf.cell(30, 10, 'Defects', 1)
-    pdf.cell(40, 10, 'Timestamp', 1)
+    pdf.set_font('Arial', 'B', 9)
+    pdf.cell(15, 10, 'Index', 1)
+    pdf.cell(35, 10, 'OCR Result', 1)
+    pdf.cell(55, 10, 'Decoded OCR', 1)
+    pdf.cell(20, 10, 'Conf', 1)
+    pdf.cell(25, 10, 'Defects', 1)
+    pdf.cell(30, 10, 'Timestamp', 1)
     pdf.ln()
 
     # Table Rows
-    pdf.set_font('Arial', '', 10)
+    pdf.set_font('Arial', '', 9)
     for wagon in wagons:
         ocr_text = wagon['ocr_text'] or "N/A"
-        conf = f"{wagon['ocr_confidence']*100:.1f}%" if wagon['ocr_confidence'] else "0%"
-        defects = wagon['defects']
+        conf = f"{wagon['ocr_confidence']*100:.0f}%" if wagon['ocr_confidence'] else "0%"
+        defects_str = wagon['defects']
         ts = wagon['timestamp'].split(' ')[1] if ' ' in wagon['timestamp'] else wagon['timestamp']
+        
+        # DECODE OCR
+        decoded_text = "OCR Failed"
+        if ocr_text and ocr_text != "OCR Failed" and ocr_text != "N/A":
+            parsed = IndianWagonParser.parse(ocr_text)
+            if parsed:
+                # Compact format: TYPE | RAILWAY | YEAR
+                decoded_text = f"{parsed['type']} | {parsed['railway']} | {parsed['year']}"
+            else:
+                decoded_text = "Invalid Format"
         
         if ocr_text == "OCR Failed":
             pdf.set_fill_color(255, 235, 235)  # light red
@@ -170,11 +186,12 @@ def generate_report(inspection, wagons):
         else:
             pdf.set_fill_color(245, 245, 245)  # neutral
         
-        pdf.cell(20, 10, str(wagon['wagon_index']), 1, 0, '', True)
-        pdf.cell(50, 10, str(ocr_text), 1, 0, '', True)
-        pdf.cell(30, 10, conf, 1, 0, '', True)
-        pdf.cell(30, 10, str(defects), 1, 0, '', True)
-        pdf.cell(40, 10, ts, 1, 1, '', True)
+        pdf.cell(15, 10, str(wagon['wagon_index']), 1, 0, '', True)
+        pdf.cell(35, 10, str(ocr_text), 1, 0, '', True)
+        pdf.cell(55, 10, decoded_text, 1, 0, '', True)
+        pdf.cell(20, 10, conf, 1, 0, '', True)
+        pdf.cell(25, 10, str(defects_str), 1, 0, '', True)
+        pdf.cell(30, 10, ts, 1, 1, '', True)
 
     
     # -----------------------------

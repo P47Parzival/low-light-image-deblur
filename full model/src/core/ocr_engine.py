@@ -102,7 +102,9 @@ class WagonOCR:
         for (bbox, text, confidence) in results:
             print(f"      [EasyOCR Raw] Text: '{text}' | Conf: {confidence:.2f}")
             if confidence > 0.1 and len(text) >= 1:
-                detected_text.append(text)
+                # Post-processing: Replace common misinterpretation
+                clean_text = text.replace('/', '1')
+                detected_text.append(clean_text)
 
         if not detected_text:
             print("      [OCR] No valid text found after filtering.")

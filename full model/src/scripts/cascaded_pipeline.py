@@ -191,7 +191,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     image_area = video_width * video_height
                     ratio = box_area / image_area
 
-                    if 0.03 < ratio < 0.40:
+                    if 0.2 < ratio < 0.8:
                         active_wagons_list.append((track_id, box))
                         if track_id not in unique_wagons:
                             unique_wagons.add(track_id)

@@ -259,7 +259,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                         blur_scores_log.append(blur_score) # Log score
 
                         # Realistic threshold for motion blur
-                        if blur_score < 80:
+                        if blur_score < 1:
                             print(
                                 f"[INFO] Deblurring wagon {wagon_id} | "
                                 f"Blur score: {blur_score:.1f} | "
@@ -287,12 +287,26 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                          cls_id = int(best_box.cls)
                          cls_name = model_c.names[cls_id]
                          
+                         # Extract Crop Coordinates
+                         ax1, ay1, ax2, ay2 = map(int, best_box.xyxy[0])
+                         
+                         # Add Padding (10%)
+                         h, w = wagon_crop.shape[:2]
+                         pad_x = int((ax2 - ax1) * 0.1)
+                         pad_y = int((ay2 - ay1) * 0.1)
+                         ax1 = max(0, ax1 - pad_x)
+                         ay1 = max(0, ay1 - pad_y)
+                         ax2 = min(w, ax2 + pad_x)
+                         ay2 = min(h, ay2 + pad_y)
+                         
+                         anomaly_crop = wagon_crop[ay1:ay2, ax1:ax2]
+
                          # Store if better confidence than previous frame
                          if wagon_id not in wagon_anomaly_data or conf > wagon_anomaly_data[wagon_id]['conf']:
                             wagon_anomaly_data[wagon_id] = {
                                 'type': cls_name,
                                 'conf': conf,
-                                'crop': wagon_crop.copy() # Save visual proof
+                                'crop': anomaly_crop.copy() # Save actual defect crop
                             }
                             print(f"[ALERT] Anomaly '{cls_name}' detected on Wagon {wagon_id} ({conf:.2f})")
                     

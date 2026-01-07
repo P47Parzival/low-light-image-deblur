@@ -47,6 +47,13 @@ def init_db():
         cursor.execute("ALTER TABLE inspections ADD COLUMN train_speed REAL")
     except sqlite3.OperationalError:
         pass
+        
+    try:
+        cursor.execute("ALTER TABLE wagons ADD COLUMN anomaly_image_path TEXT")
+        cursor.execute("ALTER TABLE wagons ADD COLUMN anomaly_type TEXT")
+        cursor.execute("ALTER TABLE wagons ADD COLUMN anomaly_confidence REAL")
+    except sqlite3.OperationalError:
+        pass
     
     try:
         cursor.execute("ALTER TABLE inspections ADD COLUMN start_time TEXT")
@@ -68,6 +75,9 @@ def init_db():
             defects TEXT,
             is_night BOOLEAN DEFAULT 0,
             timestamp TEXT NOT NULL,
+            anomaly_image_path TEXT,
+            anomaly_type TEXT,
+            anomaly_confidence REAL,
             FOREIGN KEY (inspection_id) REFERENCES inspections (id)
         )
     ''')
@@ -139,7 +149,7 @@ def update_inspection_count(inspection_id, total_wagons):
     conn.commit()
     conn.close()
 
-def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, defects, is_night):
+def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, defects, is_night, anomaly_path="", anomaly_type="", anomaly_conf=0.0):
     """Add a wagon record to the database."""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -147,9 +157,9 @@ def add_wagon(inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_
     timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     cursor.execute('''
         INSERT INTO wagons 
-        (inspection_id, wagon_index, ocr_text, ocr_confidence, original_image_path, deblurred_image_path, cropped_number_path, defects, is_night, timestamp)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, str(defects), is_night, timestamp))
+        (inspection_id, wagon_index, ocr_text, ocr_confidence, original_image_path, deblurred_image_path, cropped_number_path, defects, is_night, timestamp, anomaly_image_path, anomaly_type, anomaly_confidence)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (inspection_id, wagon_index, ocr_text, ocr_conf, orig_path, deblur_path, ocr_path, str(defects), is_night, timestamp, anomaly_path, anomaly_type, anomaly_conf))
     
     conn.commit()
     conn.close()

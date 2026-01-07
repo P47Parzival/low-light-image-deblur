@@ -29,8 +29,8 @@ def ocr_worker(input_queue, output_queue):
         item = input_queue.get()
         if item is None: break
         
-        # New Unpacking: Added ocr_path
-        wagon_id, crop, req_time, orig_path, deblur_path, ocr_path = item
+        # New Unpacking: Added ocr_path + Anomaly args
+        wagon_id, crop, req_time, orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf = item
         
         # In a real scenario, DeblurGAN would run here before OCR
         
@@ -43,16 +43,16 @@ def ocr_worker(input_queue, output_queue):
             # if parsed and not IndianWagonParser.validate_checksum(raw_text):
             #     print(f"[WARNING] Invalid checksum for wagon {raw_text}")
             #     parsed = None
-            output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path))
+            output_queue.put((wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf))
         else:
             print(f"[WARNING] OCR Failed for Wagon {wagon_id}")
             # Still pass paths so we can see the failed image
-            output_queue.put((wagon_id, "OCR Failed", None, req_time, orig_path, deblur_path, ocr_path))
+            output_queue.put((wagon_id, "OCR Failed", None, req_time, orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf))
 
 # -----------------------------
 # Cascaded Pipeline
 # -----------------------------
-def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, headless=False, inspection_id=None, frame_queue=None):
+def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, model_c_path=None, headless=False, inspection_id=None, frame_queue=None):
     if not os.path.exists(video_path): return
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
@@ -65,6 +65,16 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         model_b = None
     else:
         model_b = YOLO(model_b_path)
+    
+    # Model C (Anomaly)
+    model_c = None
+    if model_c_path and os.path.exists(model_c_path):
+        print(f"[INFO] Loading Model C (Anomaly): {model_c_path}")
+        model_c = YOLO(model_c_path)
+    else:
+          # Default fallback or warning
+          if model_c_path: print(f"[WARNING] Model C not found at {model_c_path}")
+          else: print("[INFO] Model C not provided. Anomaly detection skipped.")
 
     # DeblurGAN Setup
     deblur_engine = None
@@ -80,9 +90,12 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     deblur_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/DeblurredImg')
     original_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OriginalImg')
     ocr_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OCRimage')
+    anomaly_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/AnomalyImg')
+    
     os.makedirs(deblur_save_dir, exist_ok=True)
     os.makedirs(original_save_dir, exist_ok=True)
     os.makedirs(ocr_save_dir, exist_ok=True)
+    os.makedirs(anomaly_save_dir, exist_ok=True)
 
     cap = cv2.VideoCapture(video_path)
     
@@ -120,6 +133,10 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     metrics = {'fps': deque(maxlen=50), 'det': deque(maxlen=50), 'ocr': deque(maxlen=50)}
     wagon_data = {}
     wagon_image_cache = {}
+    wagon_data = {}
+    wagon_image_cache = {}
+    wagon_anomaly_data = {} # { wagon_id: { 'type': ..., 'conf': ..., 'crop': ... } }
+    wagon_number_data = {}  # { wagon_id: 'crop': ... }
     ocr_requested = set()
 
     # System Health Logs
@@ -254,17 +271,43 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                                 use_tta=True,        # Enable test-time augmentation for best quality
                                 sharpen_amount=0.6   # Moderate sharpening (0.5-0.8 recommended)
                             )
-                        else:
-                            # Slightly blurry but above threshold - still apply light enhancement
+
+                # -----------------------------
+                # MODEL C (ANOMALY) - EVERY FRAME
+                # -----------------------------
+                if model_c:
+                    # Run Model C on the wagon crop (Original or Deblurred? User implied input from Model A, so typically Original/Deblurred same flow)
+                    # We use wagon_crop which is now deblurred and potentially resized
+                    results_c = model_c.predict(wagon_crop, verbose=False, conf=0.2)
+                    
+                    if len(results_c[0].boxes) > 0:
+                         # Get best detection
+                         best_box =  results_c[0].boxes[0]
+                         conf = float(best_box.conf)
+                         cls_id = int(best_box.cls)
+                         cls_name = model_c.names[cls_id]
+                         
+                         # Store if better confidence than previous frame
+                         if wagon_id not in wagon_anomaly_data or conf > wagon_anomaly_data[wagon_id]['conf']:
+                            wagon_anomaly_data[wagon_id] = {
+                                'type': cls_name,
+                                'conf': conf,
+                                'crop': wagon_crop.copy() # Save visual proof
+                            }
+                            print(f"[ALERT] Anomaly '{cls_name}' detected on Wagon {wagon_id} ({conf:.2f})")
+                    
+                    else:
+                        # Slightly blurry but above threshold - still apply light enhancement
+                        if deblur_engine:
                             wagon_deblur = deblur_engine.deblur(
                                 wagon_crop,
                                 use_tta=False,       # Skip TTA for speed
                                 sharpen_amount=0.3   # Light sharpening only
                             )
-                    else:
-                        # Even if no deblur engine, log blur score for report
-                        blur_scores_log.append(calculate_blur_score(wagon_crop))
-                        wagon_deblur = wagon_crop.copy()
+                        else:
+                            # Even if no deblur engine, log blur score for report
+                            blur_scores_log.append(calculate_blur_score(wagon_crop))
+                            wagon_deblur = wagon_crop.copy()
 
 
                     # Store ONCE per wagon_id
@@ -303,69 +346,108 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                         for nbox in r.boxes.xyxy:
                             nx1, ny1, nx2, ny2 = map(int, nbox)
                             
-                            # Only trigger OCR once per wagon for now
-                            if wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
-                                # -----------------------------
-                                # PERSISTENCE: Save Images NOW
-                                # -----------------------------
-                                cache = wagon_image_cache[wagon_id] # Retrieve latest cached view
-                                current_ts = cache['ts']
-                                
-                                # Save Original
-                                orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                cv2.imwrite(orig_path, cache['orig'])
-                                
-                                # Save Deblurred
-                                deblur_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                cv2.imwrite(deblur_path, cache['deblur'])
+                            # CROP NUMBER for OCR
+                            # 1. Add Padding 
+                            pad_w = int((nx2 - nx1) * 2.0)
+                            pad_h = int((ny2 - ny1) * 1.8)
+                            px1 = max(0, nx1 - pad_w)
+                            py1 = max(0, ny1 - pad_h)
+                            px2 = min(w, nx2 + pad_w)
+                            py2 = min(h, ny2 + pad_h)
+                            
+                            number_img = wagon_crop[py1:py2, px1:px2]
+                            
+                            if number_img.size > 0:
+                                # Store best view? For now, store the latest valid one
+                                wagon_number_data[wagon_id] = {
+                                    'crop': number_img
+                                }
 
-
-                                # Prepare OCR Crop
-                                # 1. Add Padding 
-                                pad_w = int((nx2 - nx1) * 2.0)
-                                pad_h = int((ny2 - ny1) * 1.8)
-                                px1 = max(0, nx1 - pad_w)
-                                py1 = max(0, ny1 - pad_h)
-                                px2 = min(w, nx2 + pad_w)
-                                py2 = min(h, ny2 + pad_h)
-                                
-                                number_img = wagon_crop[py1:py2, px1:px2]
-                                
-                                # 2. Dynamic Scaling
-                                if number_img.size > 0:
-                                    h_img, w_img = number_img.shape[:2]
-                                    target_height = 128.0
-                                    
-                                    if h_img < target_height:
-                                        scale_factor = target_height / h_img
-                                        number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
-                                    
-                                    final_img = number_img
-
-                                    # User's Modified Deblur/Process Block (Detail Enhance)
-                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
-                                    final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
-
-                                    # Save OCR Crop
-                                    ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
-                                    cv2.imwrite(ocr_path, final_img)
-                                    
-                                    # Fallback paths for DB (Logic preserved)
-                                    if not deblur_path: deblur_path = ocr_path
-                                    if not orig_path: orig_path = ocr_path 
-                                    
-                                    # Queue for OCR
-                                    print(f"[DEBUG] Queueing OCR for Wagon {wagon_id}")
-                                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path))
-                                    ocr_requested.add(wagon_id)
-                                    
-                                    # Cleanup Cache (Optional, keeps memory low)
-                                    # del wagon_data[wagon_id]
-                                    
                             # Visualization
                             gx1, gy1 = x1 + nx1, y1 + ny1
                             gx2, gy2 = x1 + nx2, y1 + ny2
                             cv2.rectangle(frame, (gx1, gy1), (gx2, gy2), (0, 255, 0), 2)
+                
+                # -----------------------------
+                # DUAL-TRIGGER PERSISTENCE
+                # -----------------------------
+                # If we have ANY evidence (Number OR Anomaly) and haven't saved yet
+                has_number = wagon_id in wagon_number_data
+                has_anomaly = wagon_id in wagon_anomaly_data
+                
+                if (has_number or has_anomaly) and wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
+                    
+                    print(f"[DEBUG] Triggering Save for Wagon {wagon_id} (Num:{has_number}, Anom:{has_anomaly})")
+                    
+                    cache = wagon_image_cache[wagon_id]
+                    current_ts = cache['ts']
+                    
+                    # Save Original
+                    orig_path = os.path.join(original_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                    cv2.imwrite(orig_path, cache['orig'])
+                    
+                    # Save Deblurred
+                    deblur_path = os.path.join(deblur_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                    cv2.imwrite(deblur_path, cache['deblur'])
+
+
+                    # PREPARE OCR CROP (If exists)
+                    ocr_path = ""
+                    final_img = None 
+                    
+                    if has_number:
+                        number_img = wagon_number_data[wagon_id]['crop']
+                        
+                        # Dynamic Scaling & Enhancement (Copy existing logic)
+                        h_img, w_img = number_img.shape[:2]
+                        target_height = 128.0
+                        if h_img < target_height:
+                            scale_factor = target_height / h_img
+                            number_img = cv2.resize(number_img, (int(w_img * scale_factor), int(h_img * scale_factor)), interpolation=cv2.INTER_CUBIC)
+                        
+                        final_img = number_img
+                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+                        final_img = cv2.detailEnhance(final_img, sigma_s=10, sigma_r=0.15)
+                        
+                        ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
+                        cv2.imwrite(ocr_path, final_img)
+                    else:
+                        # Dummy image for OCR worker if needed? 
+                        # Or just send None? Worker might crash if crop is None.
+                        # We pass 'crop' to worker.
+                        # If has_number is False, we rely on Anomaly?
+                        # But OCR worker expects a crop to read.
+                        # If blank, we just pass a black image or the whole wagon?
+                        # Let's pass the whole wagon_deblur as fallback if no number crop?
+                        # OR just None and handle in worker.
+                        pass
+                    
+                    # SAVE ANOMALY (If exists)
+                    anomaly_path = ""
+                    anomaly_type = ""
+                    anomaly_conf = 0.0
+                    
+                    if has_anomaly:
+                        ad = wagon_anomaly_data[wagon_id]
+                        anomaly_type = ad['type']
+                        anomaly_conf = ad['conf']
+                        
+                        anomaly_path = os.path.join(anomaly_save_dir, f"anomaly_{wagon_id}_{current_ts}.jpg")
+                        cv2.imwrite(anomaly_path, ad['crop'])
+                    
+                    
+                    # QUEUE FOR OCR
+                    # If we have final_img (number crop), use it.
+                    # If not, use wagon_deblur (maybe OCR can find it on full wagon?)
+                    # Or just skip OCR part?
+                    if final_img is None:
+                         # No number crop found.
+                         # We still want to log the wagon for the anomaly.
+                         # Pass wagon_deblur to OCR worker? It might fail but acceptable.
+                         final_img = cache['deblur']
+                         
+                    ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf))
+                    ocr_requested.add(wagon_id)
 
 
         metrics['det'].append((time.time()-t0)*1000)
@@ -378,8 +460,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 # Non-blocking get. If empty, raises queue.Empty immediately.
                 item = ocr_out_q.get_nowait()
                 
-                # Unpack 7 items (CORRECTED)
-                wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path = item
+                # Unpack 10 items (CORRECTED)
+                wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf = item
                 
                 # Calculate Latency
                 latency = time.time() - req_time
@@ -412,8 +494,11 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     orig_path=orig_path or "",
                     deblur_path=deblur_path or "",
                     ocr_path=ocr_path or "",
-                    defects="None",
-                    is_night=False 
+                    defects="None", # Can update this to anomaly_type if preferred, or keep defects for legacy
+                    is_night=False,
+                    anomaly_path=anomaly_path,
+                    anomaly_type=anomaly_type,
+                    anomaly_conf=anomaly_conf
                 )
 
             except queue.Empty:
@@ -652,6 +737,7 @@ if __name__ == "__main__":
     # Placeholder for Model B until user trains it
     parser.add_argument("--model_b", default="railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt")
     parser.add_argument("--deblur_model", default="finetuned_nafnet/nafnet_wagon_finetuned.pth")
+    parser.add_argument("--model_c", default="railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     
     args = parser.parse_args()
-    cascaded_pipeline(args.video_path, args.model_a, args.model_b, args.deblur_model)
+    cascaded_pipeline(args.video_path, args.model_a, args.model_b, args.deblur_model, args.model_c)

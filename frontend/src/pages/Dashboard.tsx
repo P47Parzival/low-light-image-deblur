@@ -53,10 +53,9 @@ function App() {
         {activeTab === 'Live' ? (
           <div className="space-y-8">
             {/* Main Camera Feed - Large at Top */}
-            {/* Main Camera Feed - Large at Top */}
             <div className="group relative">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-75 transition-opacity duration-500"></div>
-              
+
               <div className="relative bg-black/30 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl group-hover:border-blue-500/20 transition-all duration-300">
                 {/* Compact Header */}
                 <div className="relative px-4 py-2 border-b border-white/10 bg-black/20">
@@ -76,7 +75,7 @@ function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Large Video Feed */}
                 <div className="h-[400px]">
                   <VideoFeed streamId={1} />
@@ -89,7 +88,7 @@ function App() {
               {[2, 3].map((streamId) => (
                 <div key={streamId} className="group relative">
                   <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/20 to-purple-500/20 rounded-3xl blur-xl opacity-0 group-hover:opacity-75 transition-opacity duration-500"></div>
-                  
+
                   <div className="relative bg-black/30 backdrop-blur-2xl border border-white/10 rounded-2xl overflow-hidden shadow-2xl group-hover:border-blue-500/20 transition-all duration-300">
                     {/* Header */}
                     <div className="relative px-4 py-2 border-b border-white/10 bg-black/20">
@@ -109,7 +108,7 @@ function App() {
                         </div>
                       </div>
                     </div>
-                    
+
                     {/* Video Feed */}
                     <div className="h-[350px]">
                       <VideoFeed streamId={streamId} />
@@ -122,7 +121,7 @@ function App() {
             {/* Wagon Details Section - Complete Information Extracted from Video */}
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-blue-500/15 to-purple-500/15 rounded-3xl blur-2xl opacity-50"></div>
-              
+
               <div className="relative bg-black/30 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
                 {/* Header */}
                 <div className="p-8 border-b border-white/10 bg-black/20">
@@ -135,7 +134,7 @@ function App() {
                       <h2 className="text-4xl font-black tracking-tight text-white">Wagon Information</h2>
                       <p className="text-zinc-400">Complete details extracted from video streams using AI analysis</p>
                     </div>
-                    
+
                     <div className="flex items-center gap-3">
                       <button className="px-5 py-3 bg-zinc-900/50 hover:bg-zinc-800/70 border border-zinc-700 rounded-xl text-sm font-semibold text-zinc-300 hover:text-white transition-all duration-200 flex items-center gap-2">
                         <Settings className="w-4 h-4" />
@@ -148,7 +147,7 @@ function App() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Wagon Details Content */}
                 <div className="p-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {[1, 2, 3].map((streamId) => (
@@ -169,7 +168,7 @@ function App() {
             {/* Enhanced Stats Section */}
             <div className="relative group">
               <div className="absolute -inset-1 bg-gradient-to-r from-emerald-500/15 to-blue-500/15 rounded-3xl blur-2xl opacity-50"></div>
-              
+
               <div className="relative bg-black/30 backdrop-blur-2xl border border-white/10 rounded-3xl overflow-hidden shadow-2xl">
                 {/* Header */}
                 <div className="p-8 border-b border-white/10 bg-black/20">
@@ -182,14 +181,14 @@ function App() {
                       <h2 className="text-4xl font-black tracking-tight text-white">Performance Dashboard</h2>
                       <p className="text-zinc-400">Comprehensive overview of inspection metrics and system health</p>
                     </div>
-                    
+
                     <button className="px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-xl text-sm font-semibold text-white transition-all duration-200 shadow-lg shadow-blue-500/30 flex items-center gap-2">
                       <Download className="w-4 h-4" />
                       Export Report
                     </button>
                   </div>
                 </div>
-                
+
                 {/* Stats Panel */}
                 <div className="p-8 space-y-8">
                   {/* Status Dashboard */}

@@ -92,6 +92,7 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
         # Define Model Paths
         model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
         model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+        model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
         deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
         
         # Create Inspection Record BEFORE processing (so frontend has an ID)
@@ -112,6 +113,7 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
             model_a_path=model_a,
             model_b_path=model_b,
             deblur_model_path=deblur_model,
+            model_c_path=model_c,
             headless=True,
             inspection_id=inspection_id,
             frame_queue=stream_queue
@@ -312,6 +314,7 @@ def run_live_pipeline(stream_url, inspection_id):
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
     model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
     model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+    model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
     
     # Run Pipeline
@@ -321,6 +324,7 @@ def run_live_pipeline(stream_url, inspection_id):
         model_a_path=model_a,
         model_b_path=model_b,
         deblur_model_path=deblur_model,
+        model_c_path=model_c,
         headless=True,
         inspection_id=inspection_id
     )

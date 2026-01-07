@@ -1,6 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import { Upload } from 'lucide-react';
 
+interface Wagon {
+    id: number;
+    wagon_index: number;
+    ocr_text: string;
+    original_image_path: string;
+    deblurred_image_path: string;
+    cropped_number_path: string;
+    anomaly_image_path: string;
+    anomaly_type: string;
+}
+
 const UploadView: React.FC = () => {
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -8,6 +19,7 @@ const UploadView: React.FC = () => {
     const [processing, setProcessing] = useState(false);
     const [status, setStatus] = useState<string | null>(null);
     const [inspectionId, setInspectionId] = useState<number | null>(null);
+    const [wagons, setWagons] = useState<Wagon[]>([]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -17,6 +29,7 @@ const UploadView: React.FC = () => {
             setStatus(null);
             setInspectionId(null);
             setProcessing(false);
+            setWagons([]);
         }
     };
 
@@ -25,6 +38,7 @@ const UploadView: React.FC = () => {
 
         setUploading(true);
         setStatus("Uploading Video...");
+        setWagons([]);
 
         const formData = new FormData();
         formData.append('file', file);
@@ -49,7 +63,6 @@ const UploadView: React.FC = () => {
             setStatus("Network error during upload.");
             setUploading(false);
         }
-        // Don't setUploading(false) here on success, keep it true to disable inputs during processing
     };
 
     // Polling Effect
@@ -59,6 +72,7 @@ const UploadView: React.FC = () => {
         if (processing && inspectionId) {
             interval = setInterval(async () => {
                 try {
+                    // 1. Check Status
                     const res = await fetch(`http://localhost:8000/inspections/${inspectionId}/status`);
                     if (res.ok) {
                         const data = await res.json();
@@ -71,6 +85,14 @@ const UploadView: React.FC = () => {
                             setStatus((prev) => prev === "Processing..." ? "Processing.. " : "Processing...");
                         }
                     }
+
+                    // 2. Fetch Live Wagons
+                    const wagonRes = await fetch(`http://localhost:8000/history/${inspectionId}`);
+                    if (wagonRes.ok) {
+                        const wagonData = await wagonRes.json();
+                        setWagons(wagonData);
+                    }
+
                 } catch (e) {
                     console.error("Polling error", e);
                 }
@@ -160,16 +182,76 @@ const UploadView: React.FC = () => {
                 </div>
             )}
 
-            {/* Guidelines / Info */}
-            <div className="bg-zinc-950/50 border border-zinc-800 rounded-2xl p-6">
-                <h3 className="text-lg font-bold text-white mb-4">How it works</h3>
-                <ul className="list-disc list-inside text-zinc-400 space-y-2">
-                    <li>Upload an MP4/AVI file of the freight train inspection.</li>
-                    <li>The system will automatically queue it for processing.</li>
-                    <li>The pipeline includes: Night Detection, Zero-DCE Enhancement, Wagon Detection, OCR, and Deblurring.</li>
-                    <li>You can monitor progress implicitly; once finished, results will appear in the <strong>History</strong> tab.</li>
-                </ul>
-            </div>
+            {/* LIVE DETECTION GRID */}
+            {wagons.length > 0 && (
+                <div className="bg-zinc-950/70 border border-zinc-800 rounded-2xl p-6 relative overflow-hidden flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-700">
+                    <div className="flex justify-between items-center">
+                        <h3 className="text-sm font-bold text-zinc-400 uppercase">Live Detections ({wagons.length})</h3>
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span>
+                            <span className="text-xs text-red-400 font-mono">LIVE FEED</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-h-[600px] overflow-y-auto pr-2">
+                        {[...wagons].reverse().map((wagon) => (
+                            <div key={wagon.id} className="bg-black/40 border border-zinc-800 rounded-lg p-3 hover:border-zinc-600 transition-all group">
+                                <div className="flex justify-between items-start mb-2">
+                                    <div>
+                                        <div className="text-xs text-zinc-500 font-mono">#{wagon.wagon_index}</div>
+                                        <div className="text-sm font-bold text-white font-mono">{wagon.ocr_text || "Scanning..."}</div>
+                                    </div>
+                                    {wagon.anomaly_type && (
+                                        <div className="bg-red-900/40 border border-red-800/50 text-red-200 text-[10px] px-2 py-0.5 rounded uppercase font-bold tracking-wider animate-pulse">
+                                            {wagon.anomaly_type}
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2 mt-2">
+                                    {/* Images */}
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-zinc-600 uppercase block">Original</span>
+                                        <div className="aspect-video bg-zinc-900 rounded overflow-hidden border border-zinc-800/50">
+                                            {wagon.original_image_path ? (
+                                                <img src={wagon.original_image_path} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            ) : <div className="w-full h-full flex items-center justify-center text-zinc-800 text-[10px]">N/A</div>}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-zinc-600 uppercase block">Deblurred</span>
+                                        <div className="aspect-video bg-zinc-900 rounded overflow-hidden border border-zinc-800/50">
+                                            {wagon.deblurred_image_path ? (
+                                                <img src={wagon.deblurred_image_path} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            ) : <div className="w-full h-full flex items-center justify-center text-zinc-800 text-[10px]">N/A</div>}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className="text-[10px] text-zinc-600 uppercase block">OCR Crop</span>
+                                        <div className="aspect-video bg-zinc-900 rounded overflow-hidden border border-zinc-800/50">
+                                            {wagon.cropped_number_path ? (
+                                                <img src={wagon.cropped_number_path} className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
+                                            ) : <div className="w-full h-full flex items-center justify-center text-zinc-800 text-[10px]">N/A</div>}
+                                        </div>
+                                    </div>
+                                    <div className="space-y-1">
+                                        <span className={`text-[10px] uppercase block ${wagon.anomaly_type ? 'text-red-400 font-bold' : 'text-zinc-600'}`}>Anomaly</span>
+                                        <div className={`aspect-video bg-zinc-900 rounded overflow-hidden border ${wagon.anomaly_type ? 'border-red-500/50 shadow-[0_0_10px_rgba(220,38,38,0.2)]' : 'border-zinc-800/50'}`}>
+                                            {wagon.anomaly_image_path ? (
+                                                <img src={wagon.anomaly_image_path} className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-zinc-800 text-[10px]">
+                                                    {wagon.anomaly_type ? 'IMG ERR' : 'PASS'}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

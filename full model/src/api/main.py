@@ -175,7 +175,7 @@ async def get_inspection_details(inspection_id: int):
         w_dict = dict(w)
         # Convert absolute path to static URL
         # Logic: find 'full model' in path and take everything after it
-        for key in ['original_image_path', 'deblurred_image_path', 'cropped_number_path']:
+        for key in ['original_image_path', 'deblurred_image_path', 'cropped_number_path', 'anomaly_image_path']:
              # Note: API might return keys slightly differently depending on DB row factory
              # But let's assume keys match schema
             val = w_dict.get(key)

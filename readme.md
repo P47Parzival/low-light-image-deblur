@@ -27,20 +27,19 @@
 ## 🎬 Demo Videos
 
 ### Wagon Number Detection & OCR
-<video src="Assests/wagon_ocr_detection.mp4" controls width="100%"></video>
-<video src="Assests/wagon_number_detection2.mp4" controls width="100%"></video>
 
+https://github.com/user-attachments/assets/d11cbba1-1502-4f12-91cb-84a42039acee
 
+https://github.com/user-attachments/assets/0754df23-d286-4631-86c6-4bea49f50947
 *Automated detection and OCR reading of wagon numbers with 11-digit Indian Railways format parsing*
 
 ### Night-Time Detection
-<video src="Assests/wagon_night_detection.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/64b87b8c-d6aa-4e7d-9cb5-0136a6752dfc
 
 *Low-light image enhancement enabling accurate detection in challenging lighting conditions*
 
 ### Fault & Anomaly Detection
-<video src="Assests/wagon_fault_detection.mp4" controls width="100%"></video>
-
+https://github.com/user-attachments/assets/fdb65a38-2339-4854-9a66-8c8e0bd0207b
 *Real-time identification of structural defects, damages, and anomalies*
 
 ---

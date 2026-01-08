@@ -91,7 +91,7 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
         
         # Define Model Paths
         model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
-        model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+        model_b = os.path.join(base_dir, "railway_hackathon_numbers_take3/number_detector_v1/weights/best.pt") 
         model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
         deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
         
@@ -329,7 +329,7 @@ def run_live_pipeline(stream_url, inspection_id):
     # Define Model Paths (Same as upload)
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
     model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
-    model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+    model_b = os.path.join(base_dir, "railway_hackathon_numbers_take3/number_detector_v1/weights/best.pt") 
     model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
     

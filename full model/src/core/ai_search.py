@@ -56,14 +56,18 @@ Schema:
 Rules:
 - Must start with SELECT
 - **ALWAYS use `ORDER BY id DESC` to show latest data first**
-- **ALWAYS select these columns for 'wagons': id, wagon_index, ocr_text, defects, original_image_path, cropped_number_path, anomaly_image_path**
+- **ALWAYS select image columns when querying wagons: original_image_path, deblurred_image_path, cropped_number_path, anomaly_image_path**
+- **When user asks about a specific inspection (by id/number), ALWAYS JOIN with wagons table to get wagon images**
 - Check defects: defects != '' AND defects != '[]'
-- Default LIMIT 5 unless "all" requested
+- Default LIMIT 10 unless "all" requested
 - Return "ERROR: Cannot answer" if query doesn't match schema
  
 Examples:
 User: "Show wagons in last video"
-SQL: SELECT w.id, w.wagon_index, w.ocr_text, w.defects, w.original_image_path, w.cropped_number_path, w.anomaly_image_path FROM wagons w JOIN inspections i ON w.inspection_id = i.id ORDER BY i.id DESC LIMIT 5
+SQL: SELECT w.id, w.wagon_index, w.ocr_text, w.defects, w.original_image_path, w.deblurred_image_path, w.cropped_number_path, w.anomaly_image_path FROM wagons w JOIN inspections i ON w.inspection_id = i.id ORDER BY i.id DESC LIMIT 10
+
+User: "Give me info about inspection 5"
+SQL: SELECT i.*, w.wagon_index, w.ocr_text, w.defects, w.original_image_path, w.deblurred_image_path, w.cropped_number_path, w.anomaly_image_path FROM inspections i LEFT JOIN wagons w ON w.inspection_id = i.id WHERE i.id = 5 LIMIT 10
 
 User: "Count total wagons"
 SQL: SELECT COUNT(*) FROM wagons

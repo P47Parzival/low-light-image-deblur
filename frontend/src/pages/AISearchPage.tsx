@@ -84,10 +84,16 @@ const AISearchPage: React.FC = () => {
             } else {
                 const images: string[] = [];
                 if (data.results && Array.isArray(data.results)) {
+                    const imageKeys = ['original_image_path', 'deblurred_image_path', 'cropped_number_path', 'anomaly_image_path'];
                     data.results.forEach((row: any) => {
-                        Object.values(row).forEach((val: any) => {
-                            if (typeof val === 'string' && val.startsWith('http') && (val.includes('.jpg') || val.includes('.png'))) {
-                                if (!images.includes(val)) images.push(val);
+                        Object.entries(row).forEach(([key, val]: [string, any]) => {
+                            // Check if it's a known image column or looks like an image URL
+                            if (typeof val === 'string' && val.startsWith('http')) {
+                                const isImageKey = imageKeys.includes(key);
+                                const isImageUrl = val.includes('.jpg') || val.includes('.png') || val.includes('.jpeg') || val.includes('.webp');
+                                if (isImageKey || isImageUrl) {
+                                    if (!images.includes(val)) images.push(val);
+                                }
                             }
                         });
                     });

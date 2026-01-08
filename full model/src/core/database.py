@@ -228,11 +228,12 @@ def get_schema_string():
     # Simplified schema to reduce token usage for free API tier
     # This uses ~70% fewer tokens than full CREATE TABLE statements
     schema_str = """inspections: id, video_name, timestamp, total_wagons, status, fps, resolution, avg_brightness, blur_stats, train_speed, start_time, end_time
-wagons: id, inspection_id, wagon_index, ocr_text, ocr_confidence, defects, is_night, timestamp, anomaly_type, anomaly_confidence
+wagons: id, inspection_id, wagon_index, ocr_text, ocr_confidence, original_image_path, deblurred_image_path, cropped_number_path, anomaly_image_path, defects, is_night, timestamp, anomaly_type, anomaly_confidence
 
 Notes:
 - defects is string like "['rust']" or "[]" (empty means no defects)
-- Join: wagons.inspection_id = inspections.id"""
+- Join: wagons.inspection_id = inspections.id
+- Image columns (original_image_path, deblurred_image_path, cropped_number_path, anomaly_image_path) contain file paths"""
     
     return schema_str
 

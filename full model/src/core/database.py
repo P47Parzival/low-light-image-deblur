@@ -222,3 +222,37 @@ def get_analytics_data():
     rows = [dict(row) for row in cursor.fetchall()]
     conn.close()
     return rows
+
+def get_schema_string():
+    """Return a CONCISE schema description optimized for minimal token usage."""
+    # Simplified schema to reduce token usage for free API tier
+    # This uses ~70% fewer tokens than full CREATE TABLE statements
+    schema_str = """inspections: id, video_name, timestamp, total_wagons, status, fps, resolution, avg_brightness, blur_stats, train_speed, start_time, end_time
+wagons: id, inspection_id, wagon_index, ocr_text, ocr_confidence, defects, is_night, timestamp, anomaly_type, anomaly_confidence
+
+Notes:
+- defects is string like "['rust']" or "[]" (empty means no defects)
+- Join: wagons.inspection_id = inspections.id"""
+    
+    return schema_str
+
+def execute_read_only_query(sql_query):
+    """Execute a read-only SQL query and return results."""
+    # Basic safety check
+    normalized_query = sql_query.strip().upper()
+    if not normalized_query.startswith("SELECT"):
+        raise ValueError("Only SELECT queries are allowed for safety.")
+        
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    try:
+        cursor.execute(sql_query)
+        rows = [dict(row) for row in cursor.fetchall()]
+        return rows
+    except Exception as e:
+        raise e
+    finally:
+        conn.close()
+

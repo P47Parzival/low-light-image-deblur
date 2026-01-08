@@ -156,9 +156,14 @@ async def generate_report_pdf(inspection_id: int):
     pdf = report_generator.generate_report(inspection, wagons)
     
     # Output to bytes
-    # The .output() method returns the document as bytes, which is ready for the response.
-    pdf_byte_array = pdf.output(dest='S').encode('latin1')
-    pdf_bytes = bytes(pdf_byte_array) # Ensure it's the immutable `bytes` type for the Response
+    # The .output() method returns a bytearray in newer FPDF versions
+    pdf_bytes = pdf.output(dest='S')
+    
+    # Convert to bytes if it's a bytearray
+    if isinstance(pdf_bytes, bytearray):
+        pdf_bytes = bytes(pdf_bytes)
+    elif isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode('latin1')
     
     headers = {
         'Content-Disposition': f'attachment; filename="report_{inspection_id}.pdf"'

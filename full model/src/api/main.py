@@ -198,6 +198,17 @@ async def get_inspection_details(inspection_id: int):
 async def get_stats():
     return mock_stats
 
+@app.get("/api/analytics")
+async def get_analytics():
+    """Get analytics data aggregated by date for the Analysis page."""
+    try:
+        analytics_data = database.get_analytics_data()
+        return analytics_data
+    except Exception as e:
+        print(f"Error fetching analytics: {e}")
+        return Response(content=f"Failed to fetch analytics: {str(e)}", status_code=500)
+
+
 def get_youtube_stream_url(youtube_url: str) -> str:
     ydl_opts = {
         "format": "best[ext=mp4]/best",

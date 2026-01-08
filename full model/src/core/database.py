@@ -196,3 +196,29 @@ def get_inspection_by_id(inspection_id):
     row = cursor.fetchone()
     conn.close()
     return dict(row) if row else None
+
+def get_analytics_data():
+    """Fetch analytics data aggregated by date for the Analysis page."""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+    
+    # Get all inspections with their wagon counts and defect counts
+    # Group by date (extract date from timestamp)
+    cursor.execute('''
+        SELECT 
+            DATE(i.timestamp) as date,
+            COUNT(DISTINCT i.id) as trains,
+            COUNT(w.id) as wagons,
+            SUM(CASE WHEN w.defects != '' AND w.defects != '[]' THEN 1 ELSE 0 END) as defects,
+            SUM(CASE WHEN w.is_night = 1 AND w.defects != '' AND w.defects != '[]' THEN 1 ELSE 0 END) as night_defects,
+            SUM(CASE WHEN w.is_night = 0 AND w.defects != '' AND w.defects != '[]' THEN 1 ELSE 0 END) as day_defects
+        FROM inspections i
+        LEFT JOIN wagons w ON i.id = w.inspection_id
+        GROUP BY DATE(i.timestamp)
+        ORDER BY DATE(i.timestamp) ASC
+    ''')
+    
+    rows = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+    return rows

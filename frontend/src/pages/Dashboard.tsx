@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Camera, Upload, History, FileText, Download, Activity, Zap, AlertCircle, Play, TrendingUp, BarChart3, Settings } from 'lucide-react';
+import { Camera, FileText, Download, Activity, TrendingUp, BarChart3, Settings } from 'lucide-react';
 
 import VideoFeed from '../components/VideoFeed';
 import WagonDetails from '../components/WagonDetails';

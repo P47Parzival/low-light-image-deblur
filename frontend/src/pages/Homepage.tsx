@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Camera, Shield, TrendingUp, AlertTriangle, ChevronRight, Minus, Play, Zap, Award, Globe, ArrowRight } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Camera, Shield, AlertTriangle, ChevronRight, Zap, Award, Globe, ArrowRight } from 'lucide-react';
 
 const RailVisionLanding = () => {
   const [scrollY, setScrollY] = useState(0);
@@ -485,7 +485,7 @@ const RailVisionLanding = () => {
           </div>
         </div>
       </section>
-      
+
       {/* Solution Section - Ultra Modern Grid */}
       <section id="solution" className="py-30 relative">
         <div className="max-w-[1400px] mx-auto px-8">

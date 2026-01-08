@@ -1,5 +1,5 @@
 import React from 'react';
-import { Activity, Upload, History, FileText, Zap, Download } from 'lucide-react';
+import { Activity, Upload, History, FileText, Download } from 'lucide-react';
 
 interface NavbarProps {
     activeTab: string;
@@ -39,9 +39,8 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
                                 {tab.label}
                             </span>
                             <span
-                                className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-500 transition-transform duration-300 ease-out origin-center ${
-                                    activeTab === tab.id ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                                }`}
+                                className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-500 transition-transform duration-300 ease-out origin-center ${activeTab === tab.id ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                                    }`}
                             ></span>
                         </button>
                     ))}

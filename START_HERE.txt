@@ -1,0 +1,64 @@
+================================================================================
+                    GARUD SETUP - READY TO RUN
+================================================================================
+
+I've created setup scripts that you can run in your terminal to see all output!
+
+STEP 1: Open your terminal in VS Code/IDE and run:
+------------------------------------------------------------------------
+cd "c:\ADANI HACKATHON\low-light-image-deblur"
+setup_backend.bat
+
+This will:
+✓ Create Python virtual environment
+✓ Install PyTorch, TensorFlow, FastAPI, and all ML libraries
+✓ Initialize SQLite database
+⏱ Takes ~10-15 minutes (downloads ~3GB)
+
+
+STEP 2: In your terminal, run:
+------------------------------------------------------------------------
+setup_frontend.bat
+
+This will:
+✓ Install React, Vite, and all Node.js dependencies
+⏱ Takes ~2-3 minutes
+
+
+STEP 3: Start the application:
+------------------------------------------------------------------------
+start.bat
+
+This will:
+✓ Start backend on http://localhost:8000
+✓ Start frontend on http://localhost:5173
+✓ Open browser automatically
+✓ Both servers run in SEPARATE VISIBLE WINDOWS so you can see all logs!
+
+
+================================================================================
+                    FILES CREATED
+================================================================================
+
+✓ setup_backend.bat  - Backend setup script
+✓ setup_frontend.bat - Frontend setup script  
+✓ start.bat          - Unified startup script
+✓ SETUP_GUIDE.md     - Detailed manual instructions
+✓ requirements.txt   - Enhanced with version pinning
+
+================================================================================
+                    WHAT TO DO NOW
+================================================================================
+
+1. Open your terminal (Ctrl+` in VS Code)
+2. Copy and paste this command:
+
+   cd "c:\ADANI HACKATHON\low-light-image-deblur" && setup_backend.bat
+
+3. Watch the installation progress in your terminal
+4. When done, run: setup_frontend.bat
+5. Finally run: start.bat
+
+All commands will show full output in your terminal!
+
+================================================================================

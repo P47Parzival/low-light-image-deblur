@@ -1,13 +1,34 @@
-opencv-python
-numpy
-fastapi
-uvicorn
-python-multipart
-torch
-torchvision
+# Core Web Framework
+fastapi>=0.100.0
+uvicorn[standard]>=0.23.0
+python-multipart>=0.0.6
+
+# Computer Vision & Image Processing
+opencv-python>=4.8.0
+numpy>=1.24.0
+pillow>=10.0.0
+
+# Deep Learning Frameworks
+torch>=2.0.0
+torchvision>=0.15.0
+
+# YOLO Object Detection
+ultralytics>=8.0.0
 roboflow
-ultralytics
-paddlepaddle
-paddleocr
-yt-dlp
-tensorflow
+
+# OCR Engines
+paddlepaddle>=2.5.0
+paddleocr>=2.7.0
+easyocr>=1.7.0
+
+# Image Enhancement
+tensorflow>=2.13.0
+
+# PDF Generation
+fpdf2>=2.7.0
+
+# Video Processing
+yt-dlp>=2023.0.0
+
+# Database
+# SQLite is built into Python, no additional package needed

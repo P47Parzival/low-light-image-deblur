@@ -16,8 +16,12 @@ from datetime import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__), '../core'))
 import database
 import report_generator
-from fastapi import FastAPI, UploadFile, File, BackgroundTasks, Request
+import ai_search
+# Trigger Reload (Query Fix)
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, BackgroundTasks, Request, HTTPException
 from fastapi.responses import Response
+from pydantic import BaseModel
+
 
 # Import Pipeline
 sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
@@ -213,6 +217,25 @@ async def get_analytics():
         print(f"Error fetching analytics: {e}")
         return Response(content=f"Failed to fetch analytics: {str(e)}", status_code=500)
 
+
+
+class SearchRequest(BaseModel):
+    query: str
+    # api_key: str  <-- Removed, using server-side key
+
+@app.post("/api/search")
+async def search_endpoint(request: SearchRequest):
+    """
+    Execute an AI-powered search query against the database.
+    """
+    # Key check removed here, handled in service
+        
+    try:
+        service = ai_search.AISearchService() # Uses global key
+        result = service.execute_search(request.query)
+        return result
+    except Exception as e:
+        return {"error": str(e)}
 
 def get_youtube_stream_url(youtube_url: str) -> str:
     ydl_opts = {

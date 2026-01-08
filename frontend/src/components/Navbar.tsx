@@ -1,5 +1,6 @@
 import React from 'react';
-import { Activity, Upload, History, FileText, Zap, Download } from 'lucide-react';
+import { Activity, Upload, History, FileText, Download, Sparkles } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 
 interface NavbarProps {
     activeTab: string;
@@ -7,6 +8,8 @@ interface NavbarProps {
 }
 
 const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
+    const navigate = useNavigate();
+
     const tabs = [
         { id: 'Live', icon: Activity, label: 'Live Inspection' },
         { id: 'Upload', icon: Upload, label: 'Upload' },
@@ -39,18 +42,27 @@ const Navbar: React.FC<NavbarProps> = ({ activeTab, onTabChange }) => {
                                 {tab.label}
                             </span>
                             <span
-                                className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-500 transition-transform duration-300 ease-out origin-center ${
-                                    activeTab === tab.id ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
-                                }`}
+                                className={`absolute bottom-0 left-0 h-[2px] w-full bg-blue-500 transition-transform duration-300 ease-out origin-center ${activeTab === tab.id ? 'scale-x-100' : 'scale-x-0 group-hover:scale-x-100'
+                                    }`}
                             ></span>
                         </button>
                     ))}
                 </div>
 
-                <button className="h-10 px-5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2">
-                    <Download className="w-4 h-4" />
-                    Export
-                </button>
+                <div className="flex items-center gap-4">
+                    <button
+                        onClick={() => navigate('/ai-search')}
+                        className="h-10 px-5 bg-zinc-800 hover:bg-zinc-700 border border-zinc-700 text-white text-sm font-semibold rounded-lg transition-all flex items-center gap-2"
+                    >
+                        <Sparkles className="w-4 h-4 text-purple-400" />
+                        Ask AI
+                    </button>
+
+                    <button className="h-10 px-5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold rounded-lg transition-all shadow-lg shadow-blue-500/30 flex items-center gap-2">
+                        <Download className="w-4 h-4" />
+                        Export
+                    </button>
+                </div>
             </div>
         </nav>
     );

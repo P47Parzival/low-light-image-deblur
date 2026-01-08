@@ -1,0 +1,24 @@
++-----------------------------------------------------------------------+
+|  [Logo]  INDIAN RAILWAYS - AUTOMATED FREIGHT INSPECTION REPORT        |
++-----------------------------------------------------------------------+
+|  Site: Ahemdabad Jn (Cam-02)   |   Date: 22-Dec-2025   |   Time: 19:24|
+|  Train Speed: 62 km/h          |   Total Wagons: 7        |   Defects: 0 |
++-----------------------------------------------------------------------+
+|  [ CRITICAL ALERTS ]                                                  |
+|  * No Critical Defects Detected by AI System                          |
+|                                                                       |
++-----------------------------------------------------------------------+
+|  [ CONSIST LIST ]                                                     |
+|  #   | Wagon ID       | Type   | Owner | Condition  | Timestamp       |
+|  1   | Track-1        | -      | -     | Good       | -               |
+|  2   | Track-2        | -      | -     | Good       | -               |
+|  3   | Track-3        | -      | -     | Good       | -               |
+|  4   | Track-4        | -      | -     | Good       | -               |
+|  5   | Track-5        | -      | -     | Good       | -               |
+|  6   | Track-6        | -      | -     | Good       | -               |
+|  7   | Track-7        | -      | -     | Good       | -               |
++-----------------------------------------------------------------------+
+|  [ AI SYSTEM LOG ]                                                    |
+|  * 29 Frames Processed                                              |
+|  * Pipeline: Cascaded YOLOv8 + PaddleOCR                              |
++-----------------------------------------------------------------------+

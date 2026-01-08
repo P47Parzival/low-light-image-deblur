@@ -5,44 +5,54 @@ import shutil
 import yaml
 from glob import glob
 
-def remap_and_copy(source_path, dest_path_images, dest_path_labels, target_class_id):
+def remap_and_copy(source_path, dest_path_images, dest_path_labels, target_class_id, oversample_factor=1):
     """
     Copies images and creates remapped label files.
+    Supports Oversampling: Copies files multiple times with unique names.
     """
     os.makedirs(dest_path_images, exist_ok=True)
     os.makedirs(dest_path_labels, exist_ok=True)
 
-    # Process images and corresponding labels
-    # YOLOv8 datasets usually have 'images' and 'labels' folders
-    
     # We look for images in the source
     source_images = glob(os.path.join(source_path, 'images', '*'))
     
     for img_path in source_images:
-        # Copy Image
-        shutil.copy(img_path, dest_path_images)
-        
-        # Process Label
         basename = os.path.basename(img_path)
-        name_root, _ = os.path.splitext(basename)
-        label_file = os.path.join(source_path, 'labels', f"{name_root}.txt")
+        name_root, ext = os.path.splitext(basename)
         
-        if os.path.exists(label_file):
-            with open(label_file, 'r') as f:
-                lines = f.readlines()
+        # Check for Label existence first
+        src_label_file = os.path.join(source_path, 'labels', f"{name_root}.txt")
+        if not os.path.exists(src_label_file):
+            continue
+
+        # Prepare Label Content
+        with open(src_label_file, 'r') as f:
+            lines = f.readlines()
+        
+        new_lines = []
+        for line in lines:
+            parts = line.strip().split()
+            if len(parts) >= 5:
+                # Replace original class_id with target_class_id
+                new_line = f"{target_class_id} " + " ".join(parts[1:])
+                new_lines.append(new_line)
+        
+        if not new_lines: continue
+        
+        # --- OVERSAMPLING LOOP ---
+        for i in range(oversample_factor):
+            # Unique suffix for duplicates
+            suffix = f"_copy{i}" if i > 0 else ""
+            new_name_root = f"{name_root}{suffix}"
             
-            new_lines = []
-            for line in lines:
-                parts = line.strip().split()
-                if len(parts) >= 5:
-                    # Replace original class_id with target_class_id
-                    # We keep coordinates/dimensions same
-                    new_line = f"{target_class_id} " + " ".join(parts[1:])
-                    new_lines.append(new_line)
+            # Copy Image
+            dest_img_path = os.path.join(dest_path_images, f"{new_name_root}{ext}")
+            shutil.copy(img_path, dest_img_path)
             
-            if new_lines:
-                with open(os.path.join(dest_path_labels, f"{name_root}.txt"), 'w') as f:
-                    f.write('\n'.join(new_lines))
+            # Write Label
+            dest_label_path = os.path.join(dest_path_labels, f"{new_name_root}.txt")
+            with open(dest_label_path, 'w') as f:
+                f.write('\n'.join(new_lines))
 
 def main():
     api_key = "u0leKBS1HrAOJli1hvLI"
@@ -52,36 +62,39 @@ def main():
         return
 
     # MAPPING CONFIGURATION
-    # (Workspace, Project, Version, Target_Class_ID, Target_Class_Name)
+    # (Workspace, Project, Version, Target_Class_ID, Target_Class_Name, Oversample_Factor)
     dataset_config = [
-        # GLOBAL CLASS 0: Wagon
-        ("aispry-ob85t", "wagon-detection-zsnyn", 2, 0, "Wagon"),
-        ("alisha-nyb7f", "wagon-detection-qxlxh", 1, 0, "Wagon"),
-        ("wagons-thdfd", "cv-alt", 2, 0, "Wagon"),
+        # GLOBAL CLASS 0: Wagon (Factor=1)
+        ("aispry-ob85t", "wagon-detection-zsnyn", 2, 0, "Wagon", 1),
+        ("alisha-nyb7f", "wagon-detection-qxlxh", 1, 0, "Wagon", 1),
+        ("wagons-thdfd", "cv-alt", 2, 0, "Wagon", 1),
         
-        # GLOBAL CLASS 1: Wagon parts
-        ("db-rail", "train-wagon-cv-project", 3, 1, "Wagon parts"),
+        # GLOBAL CLASS 1: Wagon parts (Factor=2)
+        ("db-rail", "train-wagon-cv-project", 3, 1, "Wagon parts", 2),
         
-        # GLOBAL CLASS 2: Wagon numbers
-        ("sedykh-marat-dxrw3", "wagon-numbers-detection", 1, 2, "Wagon numbers"),
-        ("student-ih3dc", "wagon-detection-qc7bh", 1, 2, "Wagon numbers"),
+        # GLOBAL CLASS 2: Wagon numbers (Factor=25)
+        ("sedykh-marat-dxrw3", "wagon-numbers-detection", 1, 2, "Wagon numbers", 25),
+        ("student-ih3dc", "wagon-detection-qc7bh", 1, 2, "Wagon numbers", 25),
+        ("wagoncounting", "wagon-numbers-jafet", 1, 2, "Wagon numbers", 25),
     ]
 
     rf = Roboflow(api_key=api_key)
     
     # Create Merged Dataset Structure
-    MERGED_DIR = "railway_hackathon_merged"
+    MERGED_DIR = "railway_hackathon_merged_oversampled"
+    if os.path.exists(MERGED_DIR): shutil.rmtree(MERGED_DIR) 
+    
     for split in ['train', 'valid', 'test']:
         os.makedirs(os.path.join(MERGED_DIR, split, 'images'), exist_ok=True)
         os.makedirs(os.path.join(MERGED_DIR, split, 'labels'), exist_ok=True)
 
     print("-" * 60)
-    print("STEP 1: Downloading & Merging Datasets")
+    print("STEP 1: Downloading & Merging Datasets (With Balancing)")
     print("-" * 60)
 
-    for workspace, project_id, version, target_id, target_name in dataset_config:
+    for workspace, project_id, version, target_id, target_name, factor in dataset_config:
         try:
-            print(f"Processing {workspace}/{project_id} v{version} -> Class {target_id} ({target_name})")
+            print(f"Processing {workspace}/{project_id} v{version} -> Class {target_id} (x{factor})")
             project = rf.workspace(workspace).project(project_id)
             dataset = project.version(version).download("yolov8")
             
@@ -89,16 +102,15 @@ def main():
             
             # Merge Train, Valid, Test splits
             for split in ['train', 'valid', 'test']:
-                # Some datasets might use 'train' or 'valid' folders differently, standardizing here
+                # Some datasets might use 'train' or 'valid' folders differently
                 src_split_path = os.path.join(location, split)
                 if not os.path.exists(src_split_path): 
-                    # Try fallback if Roboflow structure varies
                     continue
                     
                 dest_images = os.path.join(MERGED_DIR, split, 'images')
                 dest_labels = os.path.join(MERGED_DIR, split, 'labels')
                 
-                remap_and_copy(src_split_path, dest_images, dest_labels, target_id)
+                remap_and_copy(src_split_path, dest_images, dest_labels, target_id, factor)
                 
         except Exception as e:
             print(f"Skipping {project_id}: {e}")

@@ -12,16 +12,18 @@ class IndianWagonParser:
     WAGON_TYPES = {
         '10': 'BOXN', '11': 'BOXNHA', '12': 'BOXNHS', '13': 'BOXNCR', '14': 'BOXNLW',
         '15': 'BOXNB', '16': 'BOXNF', '17': 'BOXNG', '18': 'BOY', '19': 'BOST',
-        '20': 'BOXNAL', '21': 'BOXN-HS', '22': 'BOXNHL', '24': 'BOXNS',
+        '20': 'BOXNAL', '21': 'BOXN-HS', '22': 'BOXNHL', '23': 'BOXNHL','24': 'BOXNS',
         '30': 'BCN', '31': 'BCNA', '32': 'BCNAHS', '40': 'BTPN', '41': 'BTPGLN',
         '42': 'BTALN', '43': 'BTCS', '44': 'BTPH', '45': 'BTAP', '46': 'BTFLN', 
+        '70': 'BOBYN', '72': 'BOBRN', '80': 'BWTB', '85': 'BVZC',
         # Add more mappings as needed
     }
 
     RAILWAY_CODES = {
         '01': 'CR', '02': 'ER', '03': 'NR', '04': 'NER', '05': 'NFR', '06': 'SR',
-        '07': 'SER', '08': 'WR', '09': 'SCR', '16': 'NWR', '17': 'SWR', '11': 'ECR',
-        '12': 'ECoR', '13': 'NCR', '14': 'SECR', '10': 'EC', '15': 'WCR', '26': 'Metro'
+        '07': 'SER', '08': 'WR', '09': 'SCR', '10': 'ECR', '11': 'NWR', 
+        '12': 'ECoR', '13': 'NCR', '14': 'SECR', '15': 'SWR', '16': 'WCR',
+        '24': 'MoD', '25': 'CONCOR', '26': 'Private'  # Add these missing ones
     }
 
     @staticmethod
@@ -60,5 +62,26 @@ class IndianWagonParser:
 
     @staticmethod
     def validate_checksum(number_str):
-        # Placeholder for specific checksum algo
-        return True
+        clean_num = ''.join(filter(str.isdigit, number_str))
+        if len(clean_num) != 11:
+            return False
+        
+        digits = [int(d) for d in clean_num[:10]]  # C1 to C10
+        
+        # Step 1: Sum even positions (C2,C4,C6,C8,C10) → 1-based indexing
+        s1 = digits[1] + digits[3] + digits[5] + digits[7] + digits[9]
+        
+        # Step 2: Multiply by 3
+        s2 = s1 * 3
+        
+        # Step 3: Sum odd positions (C1,C3,C5,C7,C9)
+        s3 = digits[0] + digits[2] + digits[4] + digits[6] + digits[8]
+        
+        # Step 4: Add them
+        s4 = s2 + s3
+        
+        # Step 5-6: Check digit = (10 - (s4 % 10)) % 10
+        expected_check = (10 - (s4 % 10)) % 10
+        actual_check = int(clean_num[10])
+        
+        return expected_check == actual_check

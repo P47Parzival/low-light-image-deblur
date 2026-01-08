@@ -35,22 +35,22 @@ GARUD is a comprehensive AI-powered inspection system designed for Indian Railwa
 ## 🎬 Demo Videos
 
 ### Wagon Number Detection & OCR
-![Wagon OCR Detection](Assests/wagon_ocr_detection.mp4)
+<video src="Assests/wagon_ocr_detection.mp4" controls width="100%"></video>
 
 *Automated detection and OCR reading of wagon numbers with 11-digit Indian Railways format parsing*
 
 ### Night-Time Detection
-![Night Detection](Assests/wagon_night_detection.mp4)
+<video src="Assests/wagon_night_detection.mp4" controls width="100%"></video>
 
 *Low-light image enhancement enabling accurate detection in challenging lighting conditions*
 
 ### Fault & Anomaly Detection
-![Fault Detection](Assests/wagon_fault_detection.mp4)
+<video src="Assests/wagon_fault_detection.mp4" controls width="100%"></video>
 
 *Real-time identification of structural defects, damages, and anomalies*
 
 ### Live Feed Processing
-![Live Feed](Assests/Live-feed-take1.mp4)
+<video src="Assests/Live-feed-take1.mp4" controls width="100%"></video>
 
 *Real-time processing of live camera feeds with instant analysis*
 

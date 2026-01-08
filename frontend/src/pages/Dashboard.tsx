@@ -7,6 +7,7 @@ import StatsPanel from '../components/StatsPanel';
 import Navbar from '../components/Navbar';
 import UploadView from '../components/UploadView';
 import HistoryView from '../components/HistoryView';
+import Analysis from './Analysis';
 
 function App() {
   const [activeTab, setActiveTab] = useState('Live');
@@ -239,6 +240,8 @@ function App() {
             <UploadView />
           ) : activeTab === 'History' ? (
             <HistoryView />
+          ) : activeTab === 'Reports' ? (
+            <Analysis />
           ) : (
             <div className="space-y-8">
               <div className="flex items-center gap-4">

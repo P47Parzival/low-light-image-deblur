@@ -21,13 +21,13 @@ def load_model(model_path, device='cuda' if torch.cuda.is_available() else 'cpu'
     """Load NAFNet model from checkpoint"""
     print(f"[INFO] Using device: {device}")
     
-    # Initialize NAFNet model
+    # Initialize NAFNet model - CORRECTED to match finetuned checkpoint
     model = NAFNet(
         img_channel=3,
         width=64,
-        middle_blk_num=12,
-        enc_blk_nums=[2, 2, 4, 8],
-        dec_blk_nums=[2, 2, 2, 2]
+        middle_blk_num=1,              # Changed from 12 to 1
+        enc_blk_nums=[1, 1, 1, 28],    # Changed from [2, 2, 4, 8]
+        dec_blk_nums=[1, 1, 1, 1]      # Changed from [2, 2, 2, 2]
     ).to(device)
     
     # Load weights

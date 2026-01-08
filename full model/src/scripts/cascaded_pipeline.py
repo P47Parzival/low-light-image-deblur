@@ -9,6 +9,7 @@ import queue
 from collections import deque
 import numpy as np
 import json
+import torch
 
 # Add project root
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
@@ -19,6 +20,27 @@ from src.scripts.pipeline_viz import draw_stats, draw_track
 from src.core.deblur_engine import DeblurGANEngine
 from src.core.blur_metric import calculate_blur_score
 import src.core.database as database
+
+# -----------------------------
+# GPU Memory Optimization
+# -----------------------------
+def optimize_gpu_memory():
+    """Optimize GPU memory for multi-model inference on 6GB VRAM"""
+    if torch.cuda.is_available():
+        # Enable TF32 for faster matmul on Ampere GPUs (RTX 3050)
+        torch.backends.cuda.matmul.allow_tf32 = True
+        torch.backends.cudnn.allow_tf32 = True
+        
+        # Enable cuDNN benchmarking for consistent input sizes
+        torch.backends.cudnn.benchmark = True
+        
+        # Clear any cached memory
+        torch.cuda.empty_cache()
+        
+        print(f"[INFO] GPU: {torch.cuda.get_device_name(0)}")
+        print(f"[INFO] VRAM Total: {torch.cuda.get_device_properties(0).total_memory / 1e9:.1f} GB")
+        free_mem, total_mem = torch.cuda.mem_get_info()
+        print(f"[INFO] VRAM Free: {free_mem / 1e9:.1f} GB")
 
 # -----------------------------
 # OCR Processing (CPU)
@@ -52,11 +74,19 @@ def ocr_worker(input_queue, output_queue):
 # -----------------------------
 # Cascaded Pipeline
 # -----------------------------
-def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, model_c_path=None, headless=False, inspection_id=None, frame_queue=None):
+def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path, model_c_path=None, headless=False, inspection_id=None, frame_queue=None, use_fp16=True, use_torch_compile=True):
     if not os.path.exists(video_path): return
+    
+    # Optimize GPU before loading models
+    optimize_gpu_memory()
     
     print(f"[INFO] Loading Model A (Wagon): {model_a_path}")
     model_a = YOLO(model_a_path)
+    
+    # Enable FP16 (Passed as argument to track/predict)
+    if use_fp16 and torch.cuda.is_available():
+        print("[INFO] Enabling FP16 inference for YOLO Model A (via argument)")
+        # model_a.model.half() # DO NOT manually cast YOLO models before fusion!
     
     print(f"[INFO] Loading Model B (Number): {model_b_path}")
     # Check if model B exists, if not warn user
@@ -65,12 +95,18 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         model_b = None
     else:
         model_b = YOLO(model_b_path)
+        if use_fp16 and torch.cuda.is_available():
+            print("[INFO] Enabling FP16 inference for YOLO Model B (via argument)")
+            # model_b.model.half()
     
     # Model C (Anomaly)
     model_c = None
     if model_c_path and os.path.exists(model_c_path):
         print(f"[INFO] Loading Model C (Anomaly): {model_c_path}")
         model_c = YOLO(model_c_path)
+        if use_fp16 and torch.cuda.is_available():
+            print("[INFO] Enabling FP16 inference for YOLO Model C (via argument)")
+            # model_c.model.half()
     else:
           # Default fallback or warning
           if model_c_path: print(f"[WARNING] Model C not found at {model_c_path}")
@@ -82,10 +118,36 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         try:
             print(f"[INFO] Loading DeblurGAN: {deblur_model_path}")
             deblur_engine = DeblurGANEngine(deblur_model_path)
+            
+            # Optimize DeblurGAN
+            # Disable torch.compile on Windows (caused TritonMissing error)
+            if use_torch_compile and os.name != 'nt' and hasattr(torch, 'compile'):
+                print("[INFO] Compiling DeblurGAN with torch.compile...")
+                try:
+                    deblur_engine.model = torch.compile(
+                        deblur_engine.model, 
+                        mode='reduce-overhead'
+                    )
+                    print("[INFO] DeblurGAN compiled successfully")
+                except Exception as e:
+                    print(f"[WARNING] torch.compile failed: {e}. Using uncompiled model.")
+            elif os.name == 'nt':
+                print("[INFO] Skipping torch.compile on Windows (Triton not supported)")
         except Exception as e:
             print(f"[WARNING] Failed to load DeblurGAN: {e}. Running without deblurring.")
     else:
         print(f"[WARNING] DeblurGAN weights not found at {deblur_model_path}. Running without deblurring.")
+    
+    # Monitor VRAM usage after model loading
+    if torch.cuda.is_available():
+        allocated = torch.cuda.memory_allocated() / 1e9
+        reserved = torch.cuda.memory_reserved() / 1e9
+        print(f"[INFO] VRAM Allocated: {allocated:.2f} GB")
+        print(f"[INFO] VRAM Reserved: {reserved:.2f} GB")
+        
+        # Warning if using >80% of VRAM
+        if reserved > 4.8:  # 80% of 6GB
+            print("[WARNING] High VRAM usage! Consider reducing batch size or disabling TTA")
         
     deblur_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/DeblurredImg')
     original_save_dir = os.path.join(os.path.dirname(video_path), '../../full model/OriginalImg')
@@ -97,13 +159,23 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
     os.makedirs(ocr_save_dir, exist_ok=True)
     os.makedirs(anomaly_save_dir, exist_ok=True)
 
-    cap = cv2.VideoCapture(video_path)
-    
     # OCR Setup
-    ocr_in_q = mp.Queue(maxsize=10)
+    cap = cv2.VideoCapture(video_path)
+
+    # STRATEGY: Large Buffer + Drain
+    # We allow up to 1000 wagons to be queued so the main loop never blocks.
+    # The OCR worker will catch up after the video ends.
+    ocr_in_q = mp.Queue(maxsize=1000)
     ocr_out_q = mp.Queue()
     ocr_p = mp.Process(target=ocr_worker, args=(ocr_in_q, ocr_out_q), daemon=True)
     ocr_p.start()
+    
+    # ... (rest of logging setup is separate, not changing that) ...
+    # Skip to near end of loop...
+
+    # ... (Updating putting logic back to simple put, handled in next chunk) ...
+
+
     
     # Logging Setup
     import datetime
@@ -176,7 +248,14 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         if not success: break
         
         frame_cnt += 1
-        t0 = time.time()
+        t_start_frame = time.time()
+        
+        # Performance Counters (Accumulators)
+        t_model_a = 0.0
+        t_model_b = 0.0
+        t_model_c = 0.0
+        t_nafnet = 0.0
+        t_ocr_overhead = 0.0
 
         # Telemetry: Brightness (Sample every 5 frames for speed)
         if frame_cnt % 5 == 0:
@@ -186,11 +265,15 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
         # -----------------------------
         # STEP 1: Model A (Full Frame) - Detect Wagons
         # -----------------------------
-        results_a = model_a.track(frame, persist=True, tracker="../../trackers/byte_track.yaml", verbose=False)
+        t0_a = time.time()
+        results_a = model_a.track(frame, persist=True, tracker="../../trackers/byte_track.yaml", verbose=False, half=use_fp16)
+        t_model_a += (time.time() - t0_a)
+
         # DEBUG: Print raw detections
         if results_a and results_a[0].boxes.id is not None:
-             print(f"Raw Classes Detected: {results_a[0].boxes.cls.cpu().numpy()}")
-             print(f"Confidences: {results_a[0].boxes.conf.cpu().numpy()}")
+             pass 
+             # print(f"Raw Classes Detected: {results_a[0].boxes.cls.cpu().numpy()}")
+             # print(f"Confidences: {results_a[0].boxes.conf.cpu().numpy()}")
 
         active_wagons_list = []
         if results_a and results_a[0].boxes.id is not None:
@@ -202,21 +285,18 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 track_id = int(track_id)
                 if int(cls) == 0 or int(cls) == 6:  # Assuming classes 0 and 6 are wagons
                     # RULE 1: Area-based filtering
-                    # Wagon box area: 5% – 35% (User requested 3% - 40%)
                     x1, y1, x2, y2 = box
                     box_area = (x2 - x1) * (y2 - y1)
                     image_area = video_width * video_height
                     ratio = box_area / image_area
 
-                    if 0.2 < ratio < 0.8:
+                    if 0.1 < ratio < 0.8:
                         active_wagons_list.append((track_id, box))
                         if track_id not in unique_wagons:
                             unique_wagons.add(track_id)
-                            # Log timestamp for speed calculation
-                            wagon_timestamps[track_id] = t0
+                            wagon_timestamps[track_id] = t_start_frame
                     else:
                         pass
-                        # print(f"[DEBUG] Filtered box {track_id} with area ratio {ratio:.3f}")
 
         # -----------------------------
         # STEP 2: Model B (Crops) - Detect Numbers
@@ -230,7 +310,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 if x2 <= x1 or y2 <= y1:
                     continue
                 
-                # Crop Wagon (FULL CONTEXT, ORIGINAL RESOLUTION)
+                # Crop Wagon
                 wagon_crop = frame[max(0,y1):min(h,y2), max(0,x1):min(w,x2)]
 
                 if wagon_crop.size == 0:
@@ -246,51 +326,72 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     wagon_image_cache = {}
 
                 if wagon_id in wagon_image_cache:
-                    # 🔁 Reuse cached images (NO re-deblur)
                     wagon_orig = wagon_image_cache[wagon_id]['orig']
                     wagon_deblur = wagon_image_cache[wagon_id]['deblur']
                 else:
-                    # First time seeing this wagon_id
                     wagon_orig = wagon_crop.copy()
                     wagon_deblur = wagon_crop.copy()
 
                     if deblur_engine:
+                        t0_naf = time.time()
                         blur_score = calculate_blur_score(wagon_crop)
-                        blur_scores_log.append(blur_score) # Log score
+                        blur_scores_log.append(blur_score)
 
-                        # Realistic threshold for motion blur
                         if blur_score < 1:
+                            # Optimize: Resize if too large to prevent 8s inference
+                            h_c, w_c = wagon_crop.shape[:2]
+                            max_dim = 640
+                            scale = 1.0
+                            input_crop = wagon_crop
+                            
+                            if max(h_c, w_c) > max_dim:
+                                scale = max_dim / max(h_c, w_c)
+                                input_crop = cv2.resize(wagon_crop, (0,0), fx=scale, fy=scale)
+                            
                             print(
                                 f"[INFO] Deblurring wagon {wagon_id} | "
-                                f"Blur score: {blur_score:.1f} | "
-                                f"Orig size: {wagon_crop.shape[:2]}"
+                                f"Score: {blur_score:.1f} | "
+                                f"Size: {wagon_crop.shape[:2]} -> {input_crop.shape[:2]}"
                             )
-                            # Apply enhanced deblurring with TTA and sharpening
-                            wagon_deblur = deblur_engine.deblur(
-                                wagon_crop,
-                                use_tta=True,        # Enable test-time augmentation for best quality
-                                sharpen_amount=0.6   # Moderate sharpening (0.5-0.8 recommended)
-                            )
+                            
+                            # Apply enhanced deblurring
+                            if use_fp16 and torch.cuda.is_available():
+                                with torch.cuda.amp.autocast():
+                                    deblurred_small = deblur_engine.deblur(
+                                        input_crop,
+                                        use_tta=False, 
+                                        sharpen_amount=0.6
+                                    )
+                            else:
+                                deblurred_small = deblur_engine.deblur(
+                                    input_crop,
+                                    use_tta=False,
+                                    sharpen_amount=0.6
+                                )
+                                
+                            # Resize back if needed (or keep small for speed in downstream?)
+                            if scale != 1.0:
+                                wagon_deblur = cv2.resize(deblurred_small, (w_c, h_c))
+                            else:
+                                wagon_deblur = deblurred_small
+                        t_nafnet += (time.time() - t0_naf)
 
                 # -----------------------------
                 # MODEL C (ANOMALY) - EVERY FRAME
                 # -----------------------------
                 if model_c:
-                    # Run Model C on the wagon crop (Original or Deblurred? User implied input from Model A, so typically Original/Deblurred same flow)
-                    # We use wagon_crop which is now deblurred and potentially resized
-                    results_c = model_c.predict(wagon_crop, verbose=False, conf=0.2)
+                    t0_c = time.time()
+                    results_c = model_c.predict(wagon_crop, verbose=False, conf=0.2, half=use_fp16)
+                    t_model_c += (time.time() - t0_c)
                     
                     if len(results_c[0].boxes) > 0:
-                         # Get best detection
                          best_box =  results_c[0].boxes[0]
                          conf = float(best_box.conf)
                          cls_id = int(best_box.cls)
                          cls_name = model_c.names[cls_id]
                          
-                         # Extract Crop Coordinates
                          ax1, ay1, ax2, ay2 = map(int, best_box.xyxy[0])
                          
-                         # Add Padding (10%)
                          h, w = wagon_crop.shape[:2]
                          pad_x = int((ax2 - ax1) * 0.1)
                          pad_y = int((ay2 - ay1) * 0.1)
@@ -299,29 +400,27 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                          ax2 = min(w, ax2 + pad_x)
                          ay2 = min(h, ay2 + pad_y)
                          
+                         # Clamp
+                         ax1, ay1 = max(0, ax1), max(0, ay1)
+                         ax2, ay2 = min(w, ax2), min(h, ay2)
+                         
                          anomaly_crop = wagon_crop[ay1:ay2, ax1:ax2]
 
-                         # Store if better confidence than previous frame
                          if wagon_id not in wagon_anomaly_data or conf > wagon_anomaly_data[wagon_id]['conf']:
                             wagon_anomaly_data[wagon_id] = {
                                 'type': cls_name,
                                 'conf': conf,
-                                'crop': anomaly_crop.copy() # Save actual defect crop
+                                'crop': anomaly_crop.copy()
                             }
                             print(f"[ALERT] Anomaly '{cls_name}' detected on Wagon {wagon_id} ({conf:.2f})")
                     
                     else:
-                        # Slightly blurry but above threshold - still apply light enhancement
-                        if deblur_engine:
-                            wagon_deblur = deblur_engine.deblur(
-                                wagon_crop,
-                                use_tta=False,       # Skip TTA for speed
-                                sharpen_amount=0.3   # Light sharpening only
-                            )
-                        else:
-                            # Even if no deblur engine, log blur score for report
+                        # No anomaly found.
+                        # REMOVED: Redundant "Light Enhancement" which forced NAFNet on sharp images.
+                        # Just log score.
+                        if not deblur_engine:
                             blur_scores_log.append(calculate_blur_score(wagon_crop))
-                            wagon_deblur = wagon_crop.copy()
+                        pass
 
 
                     # Store ONCE per wagon_id
@@ -349,11 +448,14 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 # NOW run Model B on CLEAN wagon
                 # -----------------------------
                 if frame_cnt % 3 == 0:
-                    results_b = model_b.predict(wagon_crop, verbose=False, conf=0.19)
+                    t0_b = time.time()
+                    results_b = model_b.predict(wagon_crop, verbose=False, conf=0.19, half=use_fp16)
+                    t_model_b += (time.time() - t0_b)
                     
                     # DEBUG: Log results
                     if len(results_b[0].boxes) > 0:
-                        print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
+                        pass
+                        # print(f"[DEBUG] Wagon {wagon_id}: Model B found {len(results_b[0].boxes)} boxes")
 
                     # If Number Found (Class 0 in Model B)
                     for r in results_b:
@@ -361,7 +463,6 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                             nx1, ny1, nx2, ny2 = map(int, nbox)
                             
                             # CROP NUMBER for OCR
-                            # 1. Add Padding 
                             pad_w = int((nx2 - nx1) * 2.0)
                             pad_h = int((ny2 - ny1) * 1.8)
                             px1 = max(0, nx1 - pad_w)
@@ -369,10 +470,13 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                             px2 = min(w, nx2 + pad_w)
                             py2 = min(h, ny2 + pad_h)
                             
+                            # Clamp
+                            px1, py1 = max(0, px1), max(0, py1)
+                            px2, py2 = min(w, px2), min(h, py2)
+                            
                             number_img = wagon_crop[py1:py2, px1:px2]
                             
                             if number_img.size > 0:
-                                # Store best view? For now, store the latest valid one
                                 wagon_number_data[wagon_id] = {
                                     'crop': number_img
                                 }
@@ -391,7 +495,7 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                 
                 if (has_number or has_anomaly) and wagon_id not in ocr_requested and wagon_id in wagon_image_cache:
                     
-                    print(f"[DEBUG] Triggering Save for Wagon {wagon_id} (Num:{has_number}, Anom:{has_anomaly})")
+                    # print(f"[DEBUG] Triggering Save for Wagon {wagon_id} (Num:{has_number}, Anom:{has_anomaly})")
                     
                     cache = wagon_image_cache[wagon_id]
                     current_ts = cache['ts']
@@ -426,14 +530,6 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                         ocr_path = os.path.join(ocr_save_dir, f"wagon_{wagon_id}_{current_ts}.jpg")
                         cv2.imwrite(ocr_path, final_img)
                     else:
-                        # Dummy image for OCR worker if needed? 
-                        # Or just send None? Worker might crash if crop is None.
-                        # We pass 'crop' to worker.
-                        # If has_number is False, we rely on Anomaly?
-                        # But OCR worker expects a crop to read.
-                        # If blank, we just pass a black image or the whole wagon?
-                        # Let's pass the whole wagon_deblur as fallback if no number crop?
-                        # OR just None and handle in worker.
                         pass
                     
                     # SAVE ANOMALY (If exists)
@@ -451,20 +547,15 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                     
                     
                     # QUEUE FOR OCR
-                    # If we have final_img (number crop), use it.
-                    # If not, use wagon_deblur (maybe OCR can find it on full wagon?)
-                    # Or just skip OCR part?
                     if final_img is None:
-                         # No number crop found.
-                         # We still want to log the wagon for the anomaly.
-                         # Pass wagon_deblur to OCR worker? It might fail but acceptable.
                          final_img = cache['deblur']
                          
+                    # Blocking put is fine now with large buffer (1000 items)
                     ocr_in_q.put((wagon_id, final_img, time.time(), orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf))
                     ocr_requested.add(wagon_id)
 
 
-        metrics['det'].append((time.time()-t0)*1000)
+        metrics['det'].append((time.time()-t_start_frame)*1000)
 
         # -----------------------------
         # STEP 3: Check OCR & Buffer Data
@@ -535,7 +626,8 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
 
         # Stats
         curr_time = time.time()
-        metrics['fps'].append(1/(curr_time-prev_time) if curr_time>prev_time else 0)
+        loop_time = curr_time - prev_time
+        metrics['fps'].append(1/loop_time if loop_time > 0 else 0)
         prev_time = curr_time
         
         avg_fps = sum(metrics['fps'])/len(metrics['fps']) if metrics['fps'] else 0
@@ -543,6 +635,19 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                  f"Det Time: {sum(metrics['det'])/len(metrics['det']):.0f}ms",
                  f"Count: {len(unique_wagons)}"]
         draw_stats(frame, stats)
+        
+        # Debug Profiling Print
+        if frame_cnt % 30 == 0:
+             print(f"[PROFILE] Fr:{frame_cnt} | Loop:{loop_time*1000:.1f}ms | ModA:{t_model_a*1000:.1f}ms | ModB:{t_model_b*1000:.1f}ms | ModC:{t_model_c*1000:.1f}ms | NAF:{t_nafnet*1000:.1f}ms")
+        
+        # Debug Profiling Print
+        if frame_cnt % 30 == 0:
+             # Calculate last frame breakdown if available
+             try:
+                 ma_ms = (t_a_end - t_a_start) * 1000
+                 mc_ms = (t_c_end - t_c_start) * 1000 if 't_c_end' in locals() else 0
+                 print(f"[PROFILE] Frame {frame_cnt} | Model A: {ma_ms:.1f}ms | Model C: {mc_ms:.1f}ms | Total Loop: {(curr_time - prev_time)*1000:.1f}ms")
+             except: pass
 
                 # -----------------------------
         # VLC-STYLE OVERLAY (Progress Bar + Info)
@@ -610,10 +715,53 @@ def cascaded_pipeline(video_path, model_a_path, model_b_path, deblur_model_path,
                  print(f"[WARNING] Stream encode failed: {e}")
 
     ocr_in_q.put(None)
-    ocr_p.join()
     cap.release()
+
     if not headless:
         cv2.destroyAllWindows()
+
+    # -----------------------------
+    # DRAIN PHASE (Post-Video)
+    # -----------------------------
+    print("-" * 50)
+    print("[INFO] Video finished. Starting OCR Drain Phase...")
+    print(f"[INFO] Waiting for OCR worker to finish pending tasks...")
+    
+    while ocr_p.is_alive():
+        try:
+            # Check for results (blocking with timeout to allow join check)
+            item = ocr_out_q.get(timeout=0.5)
+            
+            wagon_id, raw_text, parsed, req_time, orig_path, deblur_path, ocr_path, anomaly_path, anomaly_type, anomaly_conf = item
+            
+            latency = time.time() - req_time
+            det_time = datetime.datetime.now().strftime("%H:%M:%S")
+            parsed_str = str(parsed) if parsed else "Invalid"
+            
+            log_entry = f"[{det_time}] [DRAIN] ID: {wagon_id} | OCR: {raw_text:<15} | Parsed: {parsed_str}"
+            print(log_entry)
+            
+            consist_log.append({'id': wagon_id, 'raw': raw_text, 'parsed': parsed, 'timestamp': det_time})
+            
+            database.add_wagon(
+                inspection_id=inspection_id,
+                wagon_index=wagon_id,
+                ocr_text=raw_text,
+                ocr_conf=0.99 if raw_text != "OCR Failed" else 0.0,
+                orig_path=orig_path or "",
+                deblur_path=deblur_path or "",
+                ocr_path=ocr_path or "",
+                defects="None",
+                is_night=False,
+                anomaly_path=anomaly_path,
+                anomaly_type=anomaly_type,
+                anomaly_conf=anomaly_conf
+            )
+        except queue.Empty:
+            pass
+            
+    ocr_p.join()
+    print("[INFO] OCR Drain Phase Complete.")
     
     # Signal End of Stream
     if frame_queue:
@@ -753,5 +901,17 @@ if __name__ == "__main__":
     parser.add_argument("--deblur_model", default="finetuned_nafnet/nafnet_wagon_finetuned.pth")
     parser.add_argument("--model_c", default="railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     
+    # GPU Optimization flags
+    parser.add_argument("--disable-fp16", action="store_true", help="Disable FP16 inference (slower, more compatible)")
+    parser.add_argument("--disable-compile", action="store_true", help="Disable torch.compile optimization")
+    
     args = parser.parse_args()
-    cascaded_pipeline(args.video_path, args.model_a, args.model_b, args.deblur_model, args.model_c)
+    cascaded_pipeline(
+        args.video_path, 
+        args.model_a, 
+        args.model_b, 
+        args.deblur_model, 
+        args.model_c,
+        use_fp16=not args.disable_fp16,
+        use_torch_compile=not args.disable_compile
+    )

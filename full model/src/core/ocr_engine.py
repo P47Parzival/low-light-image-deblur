@@ -75,17 +75,8 @@ class WagonOCR:
         self.reader = self._init_reader()
 
     def _init_reader(self):
-        """Prefer GPU when available; fall back to CPU otherwise."""
-        gpu_available = torch.cuda.is_available()
-        if gpu_available:
-            try:
-                return easyocr.Reader(['en'], gpu=True)
-            except Exception as err:
-                # Log and fall back if CUDA runtime is unavailable or misconfigured
-                print(f"EasyOCR GPU init failed ({err}); switching to CPU.")
-        else:
-            print("EasyOCR GPU not detected; using CPU.")
-
+        """Force CPU for OCR to avoid VRAM contention with main pipeline."""
+        print("Initializing EasyOCR on CPU (Forced to save VRAM)...")
         return easyocr.Reader(['en'], gpu=False)
 
     def process_wagon(self, wagon_crop_image):

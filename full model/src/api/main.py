@@ -23,7 +23,14 @@ from fastapi.responses import Response
 sys.path.append(os.path.join(os.path.dirname(__file__), '../scripts'))
 from cascaded_pipeline import cascaded_pipeline
 
+from cascaded_pipeline import cascaded_pipeline
+import multiprocessing as mp
+
 app = FastAPI()
+
+# Registry for Active Processing Streams
+# Format: { inspection_id: mp.Queue }
+active_process_streams = {}
 
 # Initialize DB (Run Migrations)
 database.init_db()
@@ -83,13 +90,22 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
         print(f"[API] Video saved to: {file_path}")
         
         # Define Model Paths
-        model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
-        model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
+        model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
+        model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+        model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
         deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
         
         # Create Inspection Record BEFORE processing (so frontend has an ID)
         inspection_id = database.create_inspection(file.filename)
         
+        # Create Queue for Streaming (Max size to prevent memory bloom)
+        # Using mp.Manager().Queue() because BackgroundTasks might run in thread pool 
+        # but cascaded_pipeline is just a function. Standard mp.Queue works if using spawn/fork.
+        # Since uvicorn runs in main process and we just call the function in a thread executor (default for fastAPI background tasks),
+        # standard queue or mp.Queue is fine.
+        stream_queue = mp.Manager().Queue(maxsize=10)
+        active_process_streams[inspection_id] = stream_queue
+
         # Trigger Pipeline in Background
         background_tasks.add_task(
             cascaded_pipeline, 
@@ -97,8 +113,10 @@ async def upload_video(background_tasks: BackgroundTasks, file: UploadFile = Fil
             model_a_path=model_a,
             model_b_path=model_b,
             deblur_model_path=deblur_model,
+            model_c_path=model_c,
             headless=True,
-            inspection_id=inspection_id
+            inspection_id=inspection_id,
+            frame_queue=stream_queue
         )
         
         return {
@@ -157,7 +175,7 @@ async def get_inspection_details(inspection_id: int):
         w_dict = dict(w)
         # Convert absolute path to static URL
         # Logic: find 'full model' in path and take everything after it
-        for key in ['original_image_path', 'deblurred_image_path', 'cropped_number_path']:
+        for key in ['original_image_path', 'deblurred_image_path', 'cropped_number_path', 'anomaly_image_path']:
              # Note: API might return keys slightly differently depending on DB row factory
              # But let's assume keys match schema
             val = w_dict.get(key)
@@ -241,6 +259,48 @@ async def video_feed(stream_id: int, request: Request):
 
 
 # -----------------------------
+# PROCESSING PREVIEW STREAM
+# -----------------------------
+async def generate_processing_frames(inspection_id: int, request: Request):
+    """Generator to stream frames from an active processing pipeline."""
+    if inspection_id not in active_process_streams:
+        # If no active stream, maybe return a placeholder or stop
+        return
+
+    q = active_process_streams[inspection_id]
+    
+    try:
+        while True:
+            if await request.is_disconnected():
+                break
+                
+            try:
+                # Non-blocking check
+                frame_bytes = q.get_nowait()
+                
+                if frame_bytes is None: # Sentinel for end
+                    break
+                    
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                
+                await asyncio.sleep(0.01) # Small sleep to yield control
+            except:
+                # Queue empty, wait a bit
+                await asyncio.sleep(0.05)
+                
+    except Exception as e:
+        print(f"Error in processing stream {inspection_id}: {e}")
+    finally:
+        # Cleanup if job done (optional, but good practice)
+        pass
+
+@app.get("/stream/processing/{inspection_id}")
+async def stream_processing_feed(inspection_id: int, request: Request):
+    return StreamingResponse(generate_processing_frames(inspection_id, request), media_type="multipart/x-mixed-replace; boundary=frame")
+
+
+# -----------------------------
 # LIVE PROCESSING CONTROL
 # -----------------------------
 live_process = None
@@ -252,8 +312,9 @@ def run_live_pipeline(stream_url, inspection_id):
     """Wrapper to run the pipeline in a separate process."""
     # Define Model Paths (Same as upload)
     base_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '../../../full model'))
-    model_a = os.path.join(base_dir, "railway_hackathon_take6/merged_model_v6_generalized/weights/best.pt")
-    model_b = os.path.join(base_dir, "railway_hackathon_numbers/number_detector_v1/weights/best.pt") 
+    model_a = os.path.join(base_dir, "railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
+    model_b = os.path.join(base_dir, "railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt") 
+    model_c = os.path.join(base_dir, "railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     deblur_model = os.path.join(base_dir, "finetuned_nafnet/nafnet_wagon_finetuned.pth")
     
     # Run Pipeline
@@ -263,6 +324,7 @@ def run_live_pipeline(stream_url, inspection_id):
         model_a_path=model_a,
         model_b_path=model_b,
         deblur_model_path=deblur_model,
+        model_c_path=model_c,
         headless=True,
         inspection_id=inspection_id
     )

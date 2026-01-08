@@ -485,33 +485,7 @@ const RailVisionLanding = () => {
           </div>
         </div>
       </section>
-
-      {/* Premium Stats Bar */}
-      <section className="border-y border-zinc-800/50 bg-gradient-to-r from-zinc-950 via-blue-950/10 to-zinc-950 backdrop-blur-xl relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500/5 to-transparent"></div>
-        <div className="max-w-[1400px] mx-auto px-8 py-12 relative">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-12">
-            {[
-              { value: '99.94%', label: 'DETECTION ACCURACY', desc: 'Industry Leading', icon: TrendingUp, color: 'from-emerald-500 to-green-600' },
-              { value: '< 650ms', label: 'RESPONSE TIME', desc: 'Real-time Processing', icon: Zap, color: 'from-blue-500 to-cyan-600' },
-              { value: '24/7/365', label: 'UPTIME SLA', desc: 'Continuous Monitoring', icon: Shield, color: 'from-purple-500 to-pink-600' },
-              { value: '75K+', label: 'WAGONS TRACKED', desc: 'Global Network', icon: Globe, color: 'from-amber-500 to-orange-600' }
-            ].map((stat, idx) => (
-              <div key={idx} className="space-y-3 group cursor-pointer">
-                <div className={`w-12 h-12 bg-gradient-to-br ${stat.color} rounded-lg flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform`}>
-                  <stat.icon className="w-6 h-6 text-white" />
-                </div>
-                <div className="text-4xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">
-                  {stat.value}
-                </div>
-                <div className="text-xs tracking-[0.15em] text-blue-400 font-bold uppercase">{stat.label}</div>
-                <div className="text-sm text-zinc-500">{stat.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
+      
       {/* Solution Section - Ultra Modern Grid */}
       <section id="solution" className="py-30 relative">
         <div className="max-w-[1400px] mx-auto px-8">

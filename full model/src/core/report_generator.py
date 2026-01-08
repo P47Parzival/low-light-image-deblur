@@ -2,6 +2,11 @@ from fpdf import FPDF
 import datetime
 import json
 import os
+import sys
+
+# Add project root for imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
+from src.core.indian_railways import IndianWagonParser
 
 class PDFReport(FPDF):
     def header(self):
@@ -75,6 +80,7 @@ def generate_report(inspection, wagons):
     # Summary Stats & System Health (Side-by-Side)
     ocr_success = len([w for w in wagons if w['ocr_text'] and w['ocr_text'] != "OCR Failed"])
     defects = len([w for w in wagons if w['defects'] != "None"])
+    anomalies = len([w for w in wagons if w.get('anomaly_type') and w['anomaly_type'] != ""])
     night = len([w for w in wagons if w['is_night']])
     
     # Save current Y
@@ -91,7 +97,8 @@ def generate_report(inspection, wagons):
     pdf.cell(90, 10, "Summary Statistics", 0, 1)
     pdf.set_font('Arial', '', 10)
     pdf.cell(90, 8, f"Successful OCR: {ocr_success}", 0, 1)
-    pdf.cell(90, 8, f"Wagons with Defects: {defects}", 0, 1)
+    pdf.cell(90, 8, f"Wagons with Defects (OCR): {defects}", 0, 1)
+    pdf.cell(90, 8, f"Wagons with Anomalies (Visual): {anomalies}", 0, 1)
     pdf.cell(90, 8, f"Night Conditions: {night}", 0, 1)
     
     # RIGHT COLUMN: System Health (Hardware)
@@ -147,21 +154,32 @@ def generate_report(inspection, wagons):
     pdf.ln(5)
 
     # Table Header
-    pdf.set_font('Arial', 'B', 10)
-    pdf.cell(20, 10, 'Index', 1)
-    pdf.cell(50, 10, 'OCR Result', 1)
-    pdf.cell(30, 10, 'Confidence', 1)
-    pdf.cell(30, 10, 'Defects', 1)
-    pdf.cell(40, 10, 'Timestamp', 1)
+    pdf.set_font('Arial', 'B', 9)
+    pdf.cell(15, 10, 'Index', 1)
+    pdf.cell(35, 10, 'OCR Result', 1)
+    pdf.cell(55, 10, 'Decoded OCR', 1)
+    pdf.cell(20, 10, 'Conf', 1)
+    pdf.cell(25, 10, 'Defects', 1)
+    pdf.cell(30, 10, 'Timestamp', 1)
     pdf.ln()
 
     # Table Rows
-    pdf.set_font('Arial', '', 10)
+    pdf.set_font('Arial', '', 9)
     for wagon in wagons:
         ocr_text = wagon['ocr_text'] or "N/A"
-        conf = f"{wagon['ocr_confidence']*100:.1f}%" if wagon['ocr_confidence'] else "0%"
-        defects = wagon['defects']
+        conf = f"{wagon['ocr_confidence']*100:.0f}%" if wagon['ocr_confidence'] else "0%"
+        defects_str = wagon['defects']
         ts = wagon['timestamp'].split(' ')[1] if ' ' in wagon['timestamp'] else wagon['timestamp']
+        
+        # DECODE OCR
+        decoded_text = "OCR Failed"
+        if ocr_text and ocr_text != "OCR Failed" and ocr_text != "N/A":
+            parsed = IndianWagonParser.parse(ocr_text)
+            if parsed:
+                # Compact format: TYPE | RAILWAY | YEAR
+                decoded_text = f"{parsed['type']} | {parsed['railway']} | {parsed['year']}"
+            else:
+                decoded_text = "Invalid Format"
         
         if ocr_text == "OCR Failed":
             pdf.set_fill_color(255, 235, 235)  # light red
@@ -170,11 +188,12 @@ def generate_report(inspection, wagons):
         else:
             pdf.set_fill_color(245, 245, 245)  # neutral
         
-        pdf.cell(20, 10, str(wagon['wagon_index']), 1, 0, '', True)
-        pdf.cell(50, 10, str(ocr_text), 1, 0, '', True)
-        pdf.cell(30, 10, conf, 1, 0, '', True)
-        pdf.cell(30, 10, str(defects), 1, 0, '', True)
-        pdf.cell(40, 10, ts, 1, 1, '', True)
+        pdf.cell(15, 10, str(wagon['wagon_index']), 1, 0, '', True)
+        pdf.cell(35, 10, str(ocr_text), 1, 0, '', True)
+        pdf.cell(55, 10, decoded_text, 1, 0, '', True)
+        pdf.cell(20, 10, conf, 1, 0, '', True)
+        pdf.cell(25, 10, str(defects_str), 1, 0, '', True)
+        pdf.cell(30, 10, ts, 1, 1, '', True)
 
     
     # -----------------------------
@@ -224,38 +243,68 @@ def generate_report(inspection, wagons):
         # Images Row
         y_start = pdf.get_y() + 2 # slight gap below header
         
-        img_width = 55
-        x_start = 13 # Indent slightly from border (10)
-        gap = 5
+        img_width = 45 # Reduced from 55 to fit 4 images
+        x_start = 12
+        gap = 3
         
         # Define images to show
+        # If anomaly exists, show label with type
+        anomaly_label = "Anomaly Check: OK"
+        if wagon.get('anomaly_type'):
+            anomaly_label = f"ANOMALY: {wagon['anomaly_type']}"
+            
         images = [
             ("Original", wagon.get('original_image_path')),
             ("Deblurred", wagon.get('deblurred_image_path')),
-            ("OCR Crop", wagon.get('cropped_number_path'))
+            ("OCR Crop", wagon.get('cropped_number_path')),
+            (anomaly_label, wagon.get('anomaly_image_path'))
         ]
         
         current_x = x_start
         
         for label, path in images:
-            # Draw Label
+            # Draw Label FIRST (before checking anomaly)
             pdf.set_xy(current_x, y_start)
             pdf.set_font('Arial', 'I', 8)
+            pdf.set_text_color(0, 0, 0)  # Default color
+            
+            # Check if this is an anomaly label
+            if "ANOMALY" in label:
+                pdf.set_text_color(200, 0, 0)  # Red text
+                pdf.set_font('Arial', 'B', 8)  # Bold
+            
+            # Draw the label ONCE
             pdf.cell(img_width, 5, label, 0, 0, 'C')
             
             # Draw Image
             if path and os.path.exists(path):
+                # Draw red border for anomalies
+                if "ANOMALY" in label:
+                    pdf.set_draw_color(255, 0, 0)
+                    pdf.set_line_width(0.5)
+                    pdf.rect(current_x-1, y_start+5, img_width+2, img_height+2)
+                else:
+                    pdf.set_draw_color(200, 200, 200)
+                
                 try:
                     pdf.image(path, x=current_x, y=y_start+6, w=img_width, h=img_height)
                 except Exception as e:
                     pdf.set_xy(current_x, y_start + 20)
                     pdf.set_font('Arial', '', 8)
+                    pdf.set_text_color(150, 150, 150)
                     pdf.cell(img_width, 5, "[Image Error]", 0, 0, 'C')
             else:
                 # Placeholder Box
+                pdf.set_text_color(150, 150, 150)
+                pdf.set_draw_color(220, 220, 220)
                 pdf.rect(current_x, y_start+6, img_width, img_height)
                 pdf.set_xy(current_x, y_start+20)
-                pdf.cell(img_width, 5, "No Image", 0, 0, 'C')
+                pdf.cell(img_width, 5, "No Image" if "ANOMALY" not in label else "Pass", 0, 0, 'C')
+            
+            # Reset for next iteration
+            pdf.set_draw_color(0, 0, 0)
+            pdf.set_text_color(0, 0, 0)
+            pdf.set_line_width(0.2)
             
             current_x += (img_width + gap)
         

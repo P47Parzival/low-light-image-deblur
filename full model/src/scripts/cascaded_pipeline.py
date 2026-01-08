@@ -749,7 +749,7 @@ if __name__ == "__main__":
     # Default Paths
     parser.add_argument("--model_a", default="railway_hackathon_take7/merged_model_v7_generalized/weights/best.pt")
     # Placeholder for Model B until user trains it
-    parser.add_argument("--model_b", default="railway_hackathon_numbers_take2/number_detector_v1/weights/best.pt")
+    parser.add_argument("--model_b", default="railway_hackathon_numbers_take3/number_detector_v1/weights/best.pt")
     parser.add_argument("--deblur_model", default="finetuned_nafnet/nafnet_wagon_finetuned.pth")
     parser.add_argument("--model_c", default="railway_hackathon_damage/damage_detector_v1/weights/best.pt")
     

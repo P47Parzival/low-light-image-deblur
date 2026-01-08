@@ -17,42 +17,31 @@
 
 ---
 
-## 🎯 System Overview
-
-GARUD is a comprehensive AI-powered inspection system designed for Indian Railways to automate wagon inspection processes. The system combines state-of-the-art computer vision, OCR technology, and anomaly detection to ensure safety, efficiency, and accuracy in railway operations.
-
-### 🚂 What GARUD Does
-
-- **Automated Wagon Detection**: Real-time detection and tracking of railway wagons
-- **OCR Number Recognition**: Accurate reading of 11-digit Indian Railways wagon numbers
-- **Low-Light Enhancement**: Advanced image processing for night-time inspections
-- **Anomaly Detection**: Automatic identification of structural defects and damages
-- **Comprehensive Reporting**: Industry-standard PDF reports with visual evidence
-- **Real-time Analytics**: Live dashboard with inspection metrics and trends
-
 ---
+
+### Architecture diagram
+
+![Architecture](Assests/Architecture%20diagram.jpeg)
+
 
 ## 🎬 Demo Videos
 
 ### Wagon Number Detection & OCR
-<video src="Assests/wagon_ocr_detection.mp4" controls width="100%"></video>
 
+https://github.com/user-attachments/assets/d11cbba1-1502-4f12-91cb-84a42039acee
+
+https://github.com/user-attachments/assets/0754df23-d286-4631-86c6-4bea49f50947
 *Automated detection and OCR reading of wagon numbers with 11-digit Indian Railways format parsing*
 
 ### Night-Time Detection
-<video src="Assests/wagon_night_detection.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/64b87b8c-d6aa-4e7d-9cb5-0136a6752dfc
 
 *Low-light image enhancement enabling accurate detection in challenging lighting conditions*
 
 ### Fault & Anomaly Detection
-<video src="Assests/wagon_fault_detection.mp4" controls width="100%"></video>
+https://github.com/user-attachments/assets/fdb65a38-2339-4854-9a66-8c8e0bd0207b
 
 *Real-time identification of structural defects, damages, and anomalies*
-
-### Live Feed Processing
-<video src="Assests/Live-feed-take1.mp4" controls width="100%"></video>
-
-*Real-time processing of live camera feeds with instant analysis*
 
 ---
 
@@ -69,6 +58,19 @@ GARUD is a comprehensive AI-powered inspection system designed for Indian Railwa
 </div>
 
 ---
+
+## 🎯 System Overview
+
+GARUD is a comprehensive AI-powered inspection system designed for Indian Railways to automate wagon inspection processes. The system combines state-of-the-art computer vision, OCR technology, and anomaly detection to ensure safety, efficiency, and accuracy in railway operations.
+
+### 🚂 What GARUD Does
+
+- **Automated Wagon Detection**: Real-time detection and tracking of railway wagons
+- **OCR Number Recognition**: Accurate reading of 11-digit Indian Railways wagon numbers
+- **Low-Light Enhancement**: Advanced image processing for night-time inspections
+- **Anomaly Detection**: Automatic identification of structural defects and damages
+- **Comprehensive Reporting**: Industry-standard PDF reports with visual evidence
+- **Real-time Analytics**: Live dashboard with inspection metrics and trends
 
 ## ⭐ Model Performance Metrics
 
@@ -100,12 +102,6 @@ GARUD is a comprehensive AI-powered inspection system designed for Indian Railwa
 - **Confidence Threshold**: 85%
 
 ---
-
-## 🏗️ Architecture
-
-### System Architecture Diagram
-
-![Architecture](Assests/Architecture%20diagram.jpeg)
 
 ### Component Breakdown
 
@@ -143,51 +139,51 @@ GARUD is a comprehensive AI-powered inspection system designed for Indian Railwa
 
 ---
 
-## 🎯 Key Features
+## Key Features
 
-### 📹 Video Processing
+### Video Processing
 - **Multi-format Support**: MP4, AVI, MOV, MKV, WebM
 - **Real-time Processing**: Live camera feed integration
 - **Frame Extraction**: Intelligent keyframe selection
 - **Batch Processing**: Multiple videos simultaneously
 - **Progress Tracking**: Real-time processing status
 
-### 🔍 Wagon Detection
+### Wagon Detection
 - **YOLOv8 Integration**: State-of-the-art object detection
 - **Multi-wagon Tracking**: Simultaneous detection of multiple wagons
 - **Bounding Box Visualization**: Clear visual indicators
 - **Confidence Scoring**: Reliability metrics for each detection
 - **Auto-cropping**: Isolated wagon images for OCR
 
-### 🌙 Low-Light Enhancement
+### Low-Light Enhancement
 - **Zero-DCE Model**: Deep learning-based enhancement
 - **Adaptive Processing**: Automatic brightness adjustment
 - **Night Mode Detection**: Intelligent scene analysis
 - **Quality Preservation**: Minimal noise introduction
 - **Real-time Enhancement**: <200ms processing time
 
-### 🔢 OCR & Number Recognition
+### OCR & Number Recognition
 - **11-Digit Format**: Indian Railways wagon number standard
 - **Format Validation**: Automatic checksum verification
 - **Railway Code Parsing**: Wagon type, railway zone, year extraction
 - **Multi-language Support**: English and Hindi characters
 - **Confidence Thresholding**: Quality assurance for readings
 
-### 🔴 Anomaly Detection
+### Anomaly Detection
 - **12+ Defect Categories**: Comprehensive fault identification
 - **Visual Highlighting**: Red border indicators for anomalies
 - **Severity Classification**: Critical, moderate, minor ratings
 - **Image Comparison**: Before/after anomaly visualization
 - **Alert System**: Automatic notifications for critical defects
 
-### 📊 Analytics Dashboard
+### Analytics Dashboard
 - **Real-time Metrics**: Live inspection statistics
 - **Trend Analysis**: Historical data visualization
 - **Performance Charts**: Recharts-powered interactive graphs
 - **Auto-refresh**: 30-second interval updates
 - **Export Capabilities**: CSV and PDF report generation
 
-### 📄 Professional PDF Reports
+### Professional PDF Reports
 - **Industry-standard Design**: Navy blue and gold color scheme
 - **Cover Page**: Executive summary with key metrics
 - **Visual Gallery**: 2 wagons per page with 4 images each
@@ -197,7 +193,7 @@ GARUD is a comprehensive AI-powered inspection system designed for Indian Railwa
 
 ---
 
-## 🚀 Installation & Setup
+## Installation & Setup
 
 ### Prerequisites
 
@@ -387,45 +383,7 @@ BATCH_SIZE=8
 
 ---
 
-## 📁 Project Structure
-
-```
-GARUD/
-├── frontend/                     # React Frontend
-│   ├── src/
-│   │   ├── pages/
-│   │   │   ├── Homepage.tsx      # Landing page
-│   │   │   ├── Dashboard.tsx     # Inspection history
-│   │   │   └── Analysis.tsx      # Analytics dashboard
-│   │   ├── components/           # Shared components
-│   │   └── App.tsx               # Main app component
-│   ├── public/                   # Static assets
-│   └── package.json              # Node.js dependencies
-│
-├── full model/                   # Backend & ML Models
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── main.py           # FastAPI application
-│   │   └── core/
-│   │       ├── database.py       # Database operations
-│   │       ├── report_generator.py # PDF generation
-│   │       └── indian_railways.py  # Wagon number parser
-│   ├── detection/
-│   │   └── inspections.db        # SQLite database
-│   └── Video/                    # Sample videos
-│
-├── Assests/                      # Documentation assets
-│   ├── Architecture diagram.jpeg
-│   ├── wagon_ocr_detection.mp4
-│   ├── wagon_night_detection.mp4
-│   └── wagon_fault_detection.mp4
-│
-└── README.md                     # This file
-```
-
----
-
-## 🧪 Testing & Validation
+## Testing & Validation
 
 ### Running Tests
 
@@ -455,7 +413,7 @@ python test_integration.py
 
 ---
 
-## 🔒 Security Features
+## Security Features
 
 ### Data Protection
 - **Local Processing**: Sensitive data processed on-premises
@@ -468,75 +426,6 @@ python test_integration.py
 - **Rate Limiting**: Request throttling
 - **Input Validation**: Comprehensive data sanitization
 - **Error Handling**: Secure error messages
-
----
-
-## 🛠️ Development
-
-### Adding New Features
-
-1. **Create Feature Branch**
-   ```bash
-   git checkout -b feature/new-detection-model
-   ```
-
-2. **Add Model Integration**
-   ```python
-   # In full model/src/core/models.py
-   def load_new_model():
-       model = YourModel.load_pretrained()
-       return model
-   ```
-
-3. **Update API Endpoints**
-   ```python
-   # In full model/src/api/main.py
-   @app.post("/api/new-feature")
-   async def new_feature_endpoint():
-       # Implementation
-       pass
-   ```
-
-4. **Add Frontend Component**
-   ```tsx
-   // In frontend/src/pages/NewFeature.tsx
-   export default function NewFeature() {
-       // Component implementation
-   }
-   ```
-
-### Code Style Guidelines
-
-- **Python**: PEP 8 compliance, type hints
-- **TypeScript/React**: ESLint + Prettier
-- **Commits**: Conventional commits format
-- **Documentation**: Inline comments + docstrings
-
----
-
-## 🐛 Troubleshooting
-
-### Common Issues
-
-**Models not loading:**
-- Ensure stable internet connection for initial download
-- Check available disk space (~10GB required)
-- Verify GPU drivers if using CUDA
-
-**Video processing fails:**
-- Confirm video format is supported
-- Check file size limits (500MB max)
-- Ensure sufficient RAM available
-
-**OCR accuracy low:**
-- Verify image quality and lighting
-- Check wagon number visibility
-- Adjust confidence threshold
-
-**PDF generation errors:**
-- Ensure FPDF library installed correctly
-- Check font files availability
-- Verify image paths exist
 
 ---
 
@@ -562,47 +451,6 @@ python test_integration.py
 - **JaidedAI** for EasyOCR library
 - **Zero-DCE Authors** for image enhancement model
 - **FastAPI Team** for excellent web framework
-
----
-
-## 📞 Support & Contributing
-
-### Getting Help
-
-1. Check [Troubleshooting](#-troubleshooting) section
-2. Review [API Documentation](#-api-endpoints)
-3. Test with provided sample videos
-4. Ensure all dependencies installed correctly
-
-### Contributing
-
-We welcome contributions! Please follow these steps:
-
-1. Fork the repository
-2. Create feature branch (`git checkout -b feature/AmazingFeature`)
-3. Commit changes (`git commit -m 'Add AmazingFeature'`)
-4. Push to branch (`git push origin feature/AmazingFeature`)
-5. Open a Pull Request
-
-### Development Roadmap
-
-- [ ] Multi-camera support for simultaneous feeds
-- [ ] Mobile app for field inspections
-- [ ] Cloud deployment with scalability
-- [ ] Advanced analytics with ML predictions
-- [ ] Integration with Indian Railways FOIS system
-
----
-
-<div align="center">
-
-## 🚂 Revolutionizing Railway Safety with AI-Powered Automation
-
-**Built with ❤️ for Indian Railways**
-
-[⬆ Back to Top](#garud---ai-powered-railway-wagon-inspection-system)
-
-</div>
 
 ---
 

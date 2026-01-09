@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Camera, Shield, TrendingUp, AlertTriangle, ChevronRight, Minus, Play, Zap, Award, Globe, ArrowRight } from 'lucide-react';
 
 const RailVisionLanding = () => {
+  const navigate = useNavigate();
   const [scrollY, setScrollY] = useState(0);
   const [activeMetric, setActiveMetric] = useState(0);
   const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
@@ -107,7 +109,10 @@ const RailVisionLanding = () => {
             <button className="text-sm text-zinc-300 hover:text-white transition-all tracking-wide hidden md:block font-medium hover:scale-105">
               LOGIN
             </button>
-            <button className="h-11 px-7 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold transition-all tracking-wide shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105">
+            <button 
+              onClick={() => navigate('/dashboard', { state: { activeTab: 'upload' } })}
+              className="h-11 px-7 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white text-sm font-semibold transition-all tracking-wide shadow-lg shadow-blue-500/30 hover:shadow-blue-500/50 hover:scale-105"
+            >
               GET STARTED
             </button>
           </div>
@@ -696,7 +701,10 @@ const RailVisionLanding = () => {
             </p>
 
             <div className="flex flex-wrap items-center gap-6 mb-20">
-              <button className="h-16 px-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold transition-all tracking-wide shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 hover:scale-105 flex items-center gap-3">
+              <button 
+                onClick={() => navigate('/dashboard', { state: { activeTab: 'upload' } })}
+                className="h-16 px-12 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold transition-all tracking-wide shadow-2xl shadow-blue-500/40 hover:shadow-blue-500/60 hover:scale-105 flex items-center gap-3"
+              >
                 <span>SCHEDULE DEMO</span>
                 <ArrowRight className="w-5 h-5" />
               </button>

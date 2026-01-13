@@ -41,7 +41,7 @@ https://github.com/user-attachments/assets/64b87b8c-d6aa-4e7d-9cb5-0136a6752dfc
 ### Fault & Anomaly Detection
 https://github.com/user-attachments/assets/fdb65a38-2339-4854-9a66-8c8e0bd0207b
 
-*Real-time identification of structural defects, damages, and anomalies*
+*Real-time identification of structural defect, damages, and anomalies*
 
 ---
 
